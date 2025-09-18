@@ -5,6 +5,7 @@
 - Arnav Singh 40258921 arnav-singh-ahlawat
 - Kevin Tam 40317186 kevintam20504
 - Saad Asghar 40157825 4kbooka
+- Lorne Geniele 40111396 hotplate5
 
 **Description**
 

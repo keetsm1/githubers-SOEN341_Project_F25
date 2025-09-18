@@ -26,4 +26,6 @@ This project is a Campus Events & Ticketing Web Application designed to help stu
 
 **Tech Stack:**
 
-  - TBD
+  - Javascript
+  - Node.js with Express.js
+  - Database: TBD

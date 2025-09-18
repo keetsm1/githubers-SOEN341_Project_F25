@@ -6,6 +6,7 @@
 - Kevin Tam 40317186 kevintam20504
 - Saad Asghar 40157825 4kbooka
 - Lorne Geniele 40111396 hotplate5
+- Wijdane Khamali 40282056 WiwiKiwi20
 
 **Description**
 

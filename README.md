@@ -6,7 +6,8 @@
 - Kevin Tam 40317186 kevintam20504
 - Saad Asghar 40157825 4kbooka
 
-**Objectives**
+**Description**
+
 This project is a Campus Events & Ticketing Web Application designed to help students discover, organize, and attend events on campus. The system streamlines event management by allowing students to browse events, claim tickets, and check in with QR codes. Organizers can create and manage events while tracking attendance through dashboards, and administrators oversee organizations, moderate event listings, and access global analytics.
 
 

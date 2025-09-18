@@ -29,3 +29,4 @@ This project is a Campus Events & Ticketing Web Application designed to help stu
   - Javascript
   - Node.js with Express.js
   - Database: TBD
+  - HTML/CSS

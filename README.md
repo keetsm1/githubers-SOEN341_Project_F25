@@ -1,13 +1,17 @@
 # githubers-SOEN341_Project_F25
 
 **Team Info:**
-- Gunkeet Mutiana 40226566 keetsm1
-- Arnav Singh 40258921 arnav-singh-ahlawat
-- Kevin Tam 40317186 kevintam20504
-- Saad Asghar 40157825 4kbooka
-- Lorne Geniele 40111396 hotplate5
-- Wijdane Khamali 40282056 WiwiKiwi20
-- Ranjit Singh Dhunna 40294791 Ranjit-Singh-Dhunna
+
+| Name                | Student ID | GitHub Username           |
+|---------------------|------------|---------------------------|
+| Gunkeet Mutiana     | 40226566   | keetsm1                   |
+| Arnav Singh         | 40258921   | arnav-singh-ahlawat       |
+| Kevin Tam           | 40317186   | kevintam20504             |
+| Saad Asghar         | 40157825   | 4kbooka                   |
+| Lorne Geniele       | 40111396   | hotplate5                 |
+| Wijdane Khamali     | 40282056   | WiwiKiwi20                |
+| Ranjit Singh Dhunna | 40294791   | Ranjit-Singh-Dhunna       |
+
   
 **Description**
 

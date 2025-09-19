@@ -13,24 +13,29 @@
 | Ranjit Singh Dhunna | 40294791   | Ranjit-Singh-Dhunna       |
 
   
-**Description**
+:pushpin: **Description**
 
 This project is a Campus Events & Ticketing Web Application designed to help students discover, organize, and attend events on campus. The system streamlines event management by allowing students to browse events, claim tickets, and check in with QR codes. Organizers can create and manage events while tracking attendance through dashboards, and administrators oversee organizations, moderate event listings, and access global analytics.
 
 
-**Core Features**
+:pushpin: **Core Features**
 
-- Apply Agile Scrum methodology with incremental sprints to gain hands-on software development experience.
+1. Student Event Experience
+   - Browse & Search for Events
+   - Event Management : Save events, claim tickets, receive tickets with QR Codes.
 
-- Use GitHub for version control, issue tracking, project management, and documentation.
+2. Organizer Event Management
+   - Event Creation: title, description, date/time, location, ticket capacity, ticket type (free or paid).
+   - Event Analytics: tickets issued, attendance rates, and remaining capacity.
+   - Tools: Export attendee list as CSV, integrated QR Scanner
 
-- Deliver a working prototype demonstrating core functionality for students, organizers, and administrators.
+3. Administrator Dashboard & Moderation
+   - Platform oversight
+   - View global stats
+   - Manage Organizations
 
-- Promote team collaboration and traceable contributions from all members.
+:pushpin: **Tech Stack:**
 
-**Tech Stack:**
-
-  - Javascript
-  - Node.js with Express.js
+  - Frontend: Javascript, React.js, HTML,CSS
+  - Backend: Node.js with Express.js
   - Database: TBD
-  - HTML/CSS

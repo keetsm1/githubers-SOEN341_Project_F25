@@ -2,4 +2,4 @@
 
 | Date       | Task                     | Time Spent | Notes                     |
 |------------|--------------------------|------------|---------------------------|
-| 2025-09-20 | Repo setup & README.md   | 2 hrs      | Created initial structure |
+| 2025-09-24 | Task.02.02, Task.02.03   | 2 hrs      | Broke down US and assigned Task  |

@@ -47,7 +47,8 @@
   <li>Ensure everyone is aligned on Sprint 1 progress(issues,subtasks...)</li>
   <li>Review current issues and adjust to a reasonable number for the first Sprint</li>
   <li>Assign one person to manage issue and subtask cleanup </li>
-  <li>Plan improvements to the meeting minutes for a more polished presentation</li>
+  <li>Assign one person to improve the meeting minutes for a more polished presentation</li>
+  <li>Assign one team member to create the GitHub project board for better Sprint management</li>
   <li>Remind team members to update their contribution logs</li>
 </ol>
 
@@ -100,6 +101,11 @@
   <tr>
     <td>Complete one assigned subtask per team member</td>
     <td>All</td>
+    <td>Pending</td>
+  </tr>
+  <tr>
+    <td>Set up a structured project board</td>
+    <td>Gurkeet</td>
     <td>Pending</td>
   </tr>
   <tr>

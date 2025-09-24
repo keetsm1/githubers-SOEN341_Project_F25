@@ -1,5 +1,5 @@
 <h1>Meeting Minute #3</h1>
-<table cellspacing="0" cellpadding="4" border="4">
+<table align="center" cellspacing="0" cellpadding="4" border="4">
   <tr>
     <td>
       <table cellspacing="0" cellpadding="4" border="3">

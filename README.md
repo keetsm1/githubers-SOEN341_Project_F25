@@ -38,4 +38,4 @@ This project is a Campus Events & Ticketing Web Application designed to help stu
 ---
   - Frontend: Javascript, React.js, HTML,CSS
   - Backend: Node.js with Express.js
-  - Database: TBD
+  - Database: PostgreSQL (Cloud-hosted on Suprabase)

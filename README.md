@@ -5,12 +5,13 @@
 | Name                | Student ID | GitHub Username           |
 |---------------------|------------|---------------------------|
 | Gunkeet Mutiana     | 40226566   | keetsm1                   |
+| Ranjit Singh Dhunna | 40294791   | Ranjit-Singh-Dhunna       |
 | Arnav Singh         | 40258921   | arnav-singh-ahlawat       |
 | Kevin Tam           | 40317186   | kevintam20504             |
 | Saad Asghar         | 40157825   | 4kbooka                   |
 | Lorne Geniele       | 40111396   | hotplate5                 |
 | Wijdane Khamali     | 40282056   | WiwiKiwi20                |
-| Ranjit Singh Dhunna | 40294791   | Ranjit-Singh-Dhunna       |
+
 
   
 :pushpin:**Description**
@@ -40,30 +41,3 @@ This project is a Campus Events & Ticketing Web Application designed to help stu
   - Backend: Node.js with Express.js
   - Database: PostgreSQL (Cloud-hosted on Supabase)
 
-📆**Weekly Meeting Schedule***
----
-| Day       | Time | Duration | Meeting Type  | Purpose |
-|-----------|------------------|----------|---------------|---------|
-| **Monday**    | 2:00 PM          | 15 min   | Monday Standup        | Share goals and updates for the upcoming work week |
-| **Wednesday** | 2:00 PM            | 15 min   | Midweek Standup| Quick check-in on progress and issues. |
-| **Thursday**   | 6:30–7:30 PM    | 15 - 60 min   | In-person sprint Review & Planning | Review completed work and modify sprint plan if necessary. |
-| **Friday**    | 2:00 PM            | 15 min   | End-of-Week Standup | Summarize progress, identify pending tasks, and prep for the next week. |
-
-> Total meeting time per week: **60 - 105 minutes**
-
-📌**Branch Structure**
----
-- **`main`**  
-  The stable branch containing project code and documentation.
-
-- **Feature Branches (`feature/<name>-<task>`)**  
-  Each team member creates their own feature branch for individual tasks or features. Branch names follow the pattern:  
-  `feature/<name>-<short-description>`, e.g., `feature/Lorne-login-page`.  
-
-📌**Workflow**
----
-1. Create a feature branch from `main`.  
-2. Commit and push changes regularly to relevant feature branch.  
-3. When the feature is ready, open a Pull Request (PR) to merge into `main`.  
-4. Review the others' PR to catch issues or get feedback.  
-5. Once approved, merge the PR and delete the feature branch.

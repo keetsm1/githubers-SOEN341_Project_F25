@@ -86,36 +86,36 @@
   <tr>
     <td>Remove excess Sprint 1 issues</td>
     <td>Ranjit</td>
-    <td>Pending</td>
+    <td>Completed</td>
   </tr>
   <tr>
     <td>Create remaining Sprint 1 issues and subtasks</td>
     <td>Ranjit</td>
-    <td>Pending</td>
+    <td>Completed</td>
   </tr>
   <tr>
     <td>Polish and finalize meeting minutes documentation</td>
     <td>Wijdane</td>
-    <td>Pending</td>
+    <td>Completed</td>
   </tr>
   <tr>
     <td>Complete one assigned subtask per team member</td>
     <td>All</td>
-    <td>Pending</td>
+    <td>Completed</td>
   </tr>
   <tr>
     <td>Set up a structured project board</td>
     <td>Gurkeet</td>
-    <td>Pending</td>
+    <td>Completed</td>
   </tr>
   <tr>
     <td>Update contribution log</td>
     <td>All</td>
-    <td>Pending</td>
+    <td>Completed</td>
   <tr>
       <td>Scheduled a follow-up meeting at 18h30 to brief team members who could not attend the 2 PM session on key discussion elements </td>
     <td>Arnav,Kevin</td>
-    <td>Pending</td>
+    <td>Completed</td>
     </tr>
 
     

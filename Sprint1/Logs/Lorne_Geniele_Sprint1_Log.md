@@ -2,4 +2,5 @@
 
 | Date       | Task             | Time Spent | Notes |
 |------------|------------------|------------|-------|
-| 2025-09-21 | API scaffolding       | 1 hr       | Created a weekly meeting schedule and defined branch workflow in README |
+| 2025-09-21 | Meeting schedule       | .5 hr       | Added to README |
+| 2025-09-21 | Branch workflow definition       | .5 hr       | Added to README |

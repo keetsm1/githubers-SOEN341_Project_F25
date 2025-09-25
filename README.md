@@ -1,19 +1,24 @@
-# githubers-SOEN341_Project_F25
-
-**Team Info:**
-
-| Name                | Student ID | GitHub Username           |
-|---------------------|------------|---------------------------|
-| Gunkeet Mutiana     | 40226566   | keetsm1                   |
-| Ranjit Singh Dhunna | 40294791   | Ranjit-Singh-Dhunna       |
-| Arnav Singh         | 40258921   | arnav-singh-ahlawat       |
-| Kevin Tam           | 40317186   | kevintam20504             |
-| Saad Asghar         | 40157825   | 4kbooka                   |
-| Lorne Geniele       | 40111396   | hotplate5                 |
-| Wijdane Khamali     | 40282056   | WiwiKiwi20                |
+<h1 align="center">📚 GitHubers - SOEN341 Project (Fall 2025)</h1>
+<p align="center">
+A collaborative campus events and ticketing web application built by our team for SOEN341.
+</p>
 
 
-  
+## 👥 Team Information
+
+| **Name**            | **Student ID** | **GitHub Username** |
+|---------------------|----------------|---------------------|
+| Gunkeet Mutiana     | 40226566       | [@keetsm1](https://github.com/keetsm1) |
+| Ranjit Singh Dhunna | 40294791       | [@Ranjit-Singh-Dhunna](https://github.com/Ranjit-Singh-Dhunna) |
+| Arnav Singh         | 40258921       | [@arnav-singh-ahlawat](https://github.com/arnav-singh-ahlawat) |
+| Kevin Tam           | 40317186       | [@kevintam20504](https://github.com/kevintam20504) |
+| Saad Asghar         | 40157825       | [@4kbooka](https://github.com/4kbooka) |
+| Lorne Geniele       | 40111396       | [@hotplate5](https://github.com/hotplate5) |
+| Wijdane Khamali     | 40282056       | [@WiwiKiwi20](https://github.com/WiwiKiwi20) |
+
+
+---
+
 :pushpin:**Description**
 ---
 This project is a Campus Events & Ticketing Web Application designed to help students discover, organize, and attend events on campus. The system streamlines event management by allowing students to browse events, claim tickets, and check in with QR codes. Organizers can create and manage events while tracking attendance through dashboards, and administrators oversee organizations, moderate event listings, and access global analytics.

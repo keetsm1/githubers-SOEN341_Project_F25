@@ -1,4 +1,4 @@
-<h1 align="center">📚 GitHubers - SOEN341 Project (Fall 2025)</h1>
+<h1 align="center">📚 githubers-SOEN341_Project_F25</h1>
 <p align="center">
 A collaborative campus events and ticketing web application built by our team for SOEN341.
 </p>

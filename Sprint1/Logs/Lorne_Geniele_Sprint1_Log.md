@@ -2,4 +2,4 @@
 
 | Date       | Task             | Time Spent | Notes |
 |------------|------------------|------------|-------|
-| 2025-09-21 | API scaffolding       | 1 hr       | Initialized Express server |
+| 2025-09-21 | API scaffolding       | 1 hr       | Created a weekly meeting schedule and defined branch workflow in README |

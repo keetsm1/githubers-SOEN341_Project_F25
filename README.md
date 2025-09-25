@@ -45,4 +45,8 @@ This project is a Campus Events & Ticketing Web Application designed to help stu
   - Frontend: Javascript, React.js, HTML,CSS
   - Backend: Node.js with Express.js
   - Database: PostgreSQL (Cloud-hosted on Supabase)
+---
+![Logo](https://upload.wikimedia.org/wikipedia/fr/9/97/Universit%C3%A9_Concordia_%28logo%29.svg)
+
+
 

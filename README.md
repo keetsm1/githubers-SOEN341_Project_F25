@@ -58,7 +58,7 @@ This project is a Campus Events & Ticketing Web Application designed to help stu
 
 - **Feature Branches (`feature/<name>-<task>`)**  
   Each team member creates their own feature branch for individual tasks or features. Branch names follow the pattern:  
-  `feature/<your-name>-<short-description>`, e.g., `feature/Lorne-login-page`.  
+  `feature/<name>-<short-description>`, e.g., `feature/Lorne-login-page`.  
 
 📌**Workflow**
 ---

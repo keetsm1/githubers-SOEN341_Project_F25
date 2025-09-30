@@ -1,5 +1,77 @@
 // Database Service Layer - Placeholder functions for Supabase integration
 // All functions here represent what would be actual database calls
+import {createClient} from '@supabase/supabase-js';
+
+const viteEnv = (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
+const nodeEnv =
+  typeof process !== 'undefined' && (process as any).env
+    ? (process as any).env
+    : {};
+
+const supaBaseUrl: string =
+  viteEnv.VITE_SUPABASE_URL ||
+  nodeEnv.NEXT_PUBLIC_SUPABASE_URL ||
+  '';
+
+const supabaseAnonKey: string =
+  viteEnv.VITE_SUPABASE_ANON_KEY ||
+  nodeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
+export const isSupabaseEnabled = !!(supaBaseUrl && supabaseAnonKey);
+
+
+export const supabase = isSupabaseEnabled ? 
+  createClient(supaBaseUrl as string, supabaseAnonKey as string,{
+    auth: {
+      persistSession  : true,
+      autoRefreshToken: true,
+  },
+}): null;
+
+
+export const auth={
+  async signUp(email:string,password:string,fullName:string){
+    if (!supabase){
+      throw new Error('Supabase not configured');
+    }
+
+    const {data,error}= await supabase.auth.signUp({
+      email,
+      password,
+      options:{
+        data:{full_name:fullName},
+      },
+    });
+
+    return {
+      user: data.user ?? null,
+      session: data.session ?? null,
+      error: error ?? null,
+      errorMessage: error?.message || null,
+    };
+  },
+
+  async signIn(email: string, password: string) {
+    if (!isSupabaseEnabled || !supabase) {
+      throw new Error('Supabase is not configured. Check your .env.');
+    }
+
+    const e= email.trim().toLowerCase();
+    const p= password.trim();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: e,
+      password: p,
+    });
+
+    return {
+      user: data.user ?? null,
+      session: data.session ?? null,
+      error: error ?? null,
+      errorMessage: error?.message || null,
+    };
+  },
+}
+
 
 export interface Event {
   id: string;

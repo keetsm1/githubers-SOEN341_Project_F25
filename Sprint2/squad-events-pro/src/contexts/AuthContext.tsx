@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseEnabled } from '@/lib/supabase';
-
+import {auth} from '../services/database'
 export type UserRole = 'student' | 'company' | 'admin';
 
 export interface User {
@@ -121,34 +121,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      if (isSupabaseEnabled && supabase) {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) return false;
-        const session = data.session;
-        if (session?.user) {
-          const mapped: User = {
-            id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.full_name || session.user.email || 'User',
-            role: (session.user.user_metadata?.role as UserRole) || 'student',
-            isApproved: true,
-            avatar: session.user.user_metadata?.avatar_url,
-          };
-          setUser(mapped);
-          localStorage.setItem('campusUser', JSON.stringify(mapped));
-          return true;
-        }
-        return false;
-      } else {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const foundUser = mockUsers.find(u => u.email === email);
-        if (foundUser) {
-          setUser(foundUser);
-          localStorage.setItem('campusUser', JSON.stringify(foundUser));
-          return true;
-        }
-        return false;
-      }
+      const { error, user, session } = await auth.signIn(email, password);
+
+      if (error || !user) return false;
+
+      const mapped: User = {
+        id: user.id,
+        email: user.email || '',
+        name: user.user_metadata?.full_name || user.email || 'User',
+        role: (user.user_metadata?.role as UserRole) || 'student',
+        isApproved: true,
+        avatar: user.user_metadata?.avatar_url,
+      };
+
+      setUser(mapped);
+      localStorage.setItem('campusUser', JSON.stringify(mapped));
+      return true;
     } finally {
       setIsLoading(false);
     }

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import {auth} from "../../services/database"
 import { useNavigate } from 'react-router-dom';
+import {useAuth} from '../../contexts/AuthContext'
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const SignUp = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
 
 
     const handleSubmit = async (ev: React.FormEvent) => {
@@ -60,12 +62,9 @@ const SignUp = () => {
       }
 
       if (session?.user) {
-        toast({ title: "Success", description: "Account created & logged in 🎉" });
-      } else {
-        toast({ title: "Success", description: "Account created. Please sign in." });
-        navigate('/', {replace: true});
-        
-      }
+        toast({ title: "Success", description: "Account created, please login! 🎉" });
+        navigate('/');
+      } 
 
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Something went wrong.", variant: "destructive" });

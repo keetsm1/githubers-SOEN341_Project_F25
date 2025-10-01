@@ -8,6 +8,7 @@ import { toast } from "@/components/ui/use-toast";
 import {auth} from "../../services/database"
 import { useNavigate } from 'react-router-dom';
 import {useAuth} from '../../contexts/AuthContext'
+import { supabase } from '@/lib/supabase';
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -52,25 +53,48 @@ const SignUp = () => {
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      const {error, session }= await auth.signUp(email, password, fullName);
+  try {
+    setIsSubmitting(true);
 
-      if (error){
-        toast({ title: "Sign Up failed", description: error.message || "Something went wrong.", variant: "destructive" });
-        return;
-      }
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    });
 
-      if (session?.user) {
-        toast({ title: "Success", description: "Account created, please login! 🎉" });
-        navigate('/');
-      } 
-
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Something went wrong.", variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
+    if (error) {
+      toast({ title: "Sign Up failed", description: error.message, variant: "destructive" });
+      return;
     }
+
+    const user = data?.user;
+    const session = data?.session;
+
+    if (!user || !session) {
+      toast({ title: "Unexpected", description: "No session returned after signup.", variant: "destructive" });
+      return;
+    }
+
+    const { error: profileErr } = await supabase
+      .from("profiles")
+      .upsert(
+        { user_id: user.id, full_name: fullName }, // include only columns that exist
+        { onConflict: "user_id" }
+      );
+
+    if (profileErr) {
+      toast({ title: "Profile insert failed", description: profileErr.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Success", description: "Account created! 🎉" });
+    navigate("/"); 
+     } catch (err: any) {
+    toast({ title: "Error", description: err.message || "Something went wrong.", variant: "destructive" });
+    } finally {
+    setIsSubmitting(false);
+    }
+
   };
 
 

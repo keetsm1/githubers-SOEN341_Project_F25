@@ -31,11 +31,11 @@
         </tr>
         <tr>
           <td>Present</td>
-          <td>Ranjit,Saad,Lorne,Arnav,Kevin</td>
+          <td>Ranjit,Saad,Lorne,Arnav,Kevin,Gunkeet</td>
         </tr>
         <tr>
           <td>Absent</td>
-          <td>Wijdane,Gunkeet</td>
+          <td>Wijdane</td>
         </tr>
       </table>
     </td>
@@ -105,3 +105,4 @@
   </tr>
 </table>
   
+

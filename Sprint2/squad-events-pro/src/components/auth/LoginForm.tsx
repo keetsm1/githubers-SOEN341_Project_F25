@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Calendar, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom';
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -21,7 +22,7 @@ const LoginForm = () => {
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: "Invalid email or password. Try: alex@university.edu, sarah@techclub.org, or admin@university.edu"
+        description: "Invalid email or password. Please Try Again"
       });
     } else {
       toast({
@@ -79,7 +80,11 @@ const LoginForm = () => {
                 'Sign In'
               )}
             </Button>
-          </form>
+              
+            <Link to="/SignUp" className='block mt-2 text-center text-sm font-medium text-primary hover:underline'>
+              <p className='text-center'>Create an account</p>
+            </Link>
+          </form> 
           
           <div className="mt-6 p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground mb-2">Demo accounts:</p>

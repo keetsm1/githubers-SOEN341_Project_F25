@@ -15,6 +15,7 @@ import ApproveCompanies from "./pages/admin/ApproveCompanies";
 import AllEvents from "./pages/admin/AllEvents";
 import Stats from "./pages/admin/Stats";
 import NotFound from "./pages/NotFound";
+import SignUp from "./components/auth/SignUp";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/signup" element={<SignUp />} />
             <Route path="/search" element={<SearchEvents />} />
             <Route path="/my-events" element={<MyEvents />} />
             <Route path="/create-event" element={<CreateEvent />} />

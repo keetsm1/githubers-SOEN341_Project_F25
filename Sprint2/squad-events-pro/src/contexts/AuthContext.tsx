@@ -63,6 +63,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const fetchProfile = async (userId: string): Promise<{
+    full_name?: string | null;
+    role?: string | null;
+    avatar_url?: string | null;
+    organization?: string | null;
+  } | null> => {
+    if (!isSupabaseEnabled || !supabase) return null;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('full_name, role, avatar_url')
+      .eq('user_id', userId)
+      .single();
+    if (error) {
+      // Swallow and fallback to metadata/local
+      return null;
+    }
+    return data as any;
+  };
+
+  const mapSupabaseUserToAppUser = async (u: any): Promise<User> => {
+    // Try to read profile first; fallback to user metadata
+    const profile = await fetchProfile(u.id);
+    const roleFromProfile = (profile?.role || u.user_metadata?.role) as UserRole | undefined;
+    const nameFromProfile = profile?.full_name || u.user_metadata?.full_name || u.email || 'User';
+    const avatarFromProfile = profile?.avatar_url || u.user_metadata?.avatar_url || undefined;
+    const mapped: User = {
+      id: u.id,
+      email: u.email || '',
+      name: nameFromProfile || 'User',
+      role: (roleFromProfile === 'student' || roleFromProfile === 'company' || roleFromProfile === 'admin')
+        ? roleFromProfile
+        : 'student',
+      isApproved: true,
+      avatar: avatarFromProfile || undefined,
+    };
+    return mapped;
+  };
+
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     const init = async () => {
@@ -71,14 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const { data } = await supabase.auth.getSession();
           const session = data.session;
           if (session?.user) {
-            const mapped: User = {
-              id: session.user.id,
-              email: session.user.email || '',
-              name: session.user.user_metadata?.full_name || session.user.email || 'User',
-              role: (session.user.user_metadata?.role as UserRole) || 'student',
-              isApproved: true,
-              avatar: session.user.user_metadata?.avatar_url,
-            };
+            const mapped: User = await mapSupabaseUserToAppUser(session.user);
             setUser(mapped);
             localStorage.setItem('campusUser', JSON.stringify(mapped));
           } else {
@@ -87,16 +118,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
-              const mapped: User = {
-                id: session.user.id,
-                email: session.user.email || '',
-                name: session.user.user_metadata?.full_name || session.user.email || 'User',
-                role: (session.user.user_metadata?.role as UserRole) || 'student',
-                isApproved: true,
-                avatar: session.user.user_metadata?.avatar_url,
-              };
-              setUser(mapped);
-              localStorage.setItem('campusUser', JSON.stringify(mapped));
+              (async () => {
+                const mapped: User = await mapSupabaseUserToAppUser(session.user);
+                setUser(mapped);
+                localStorage.setItem('campusUser', JSON.stringify(mapped));
+              })();
             } else {
               setUser(null);
               localStorage.removeItem('campusUser');
@@ -124,15 +150,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error, user, session } = await auth.signIn(email, password);
 
       if (error || !user) return false;
-
-      const mapped: User = {
-        id: user.id,
-        email: user.email || '',
-        name: user.user_metadata?.full_name || user.email || 'User',
-        role: (user.user_metadata?.role as UserRole) || 'student',
-        isApproved: true,
-        avatar: user.user_metadata?.avatar_url,
-      };
+      let mapped: User;
+      if (isSupabaseEnabled && supabase) {
+        mapped = await mapSupabaseUserToAppUser(user);
+      } else {
+        // Fallback to metadata only if Supabase client isn't available
+        mapped = {
+          id: user.id,
+          email: user.email || '',
+          name: user.user_metadata?.full_name || user.email || 'User',
+          role: (user.user_metadata?.role as UserRole) || 'student',
+          isApproved: true,
+          avatar: user.user_metadata?.avatar_url,
+        };
+      }
 
       setUser(mapped);
       localStorage.setItem('campusUser', JSON.stringify(mapped));

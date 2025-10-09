@@ -82,9 +82,15 @@ const LoginForm = () => {
             </Button>
               
             <Link to="/SignUp" className='block mt-2 text-center text-sm font-medium text-primary hover:underline'>
-              <p className='text-center'>Create an account</p>
+              <p className='text-center'>Are you a student? Create an account</p>
+            </Link>
+
+            <Link to="/OrgSignUp" className='block mt-2 text-center text-sm font-medium text-primary hover:underline'>
+              <p className='text-center'>Are you an organization? Create an account</p>
             </Link>
           </form> 
+
+
           
           <div className="mt-6 p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground mb-2">Demo accounts:</p>

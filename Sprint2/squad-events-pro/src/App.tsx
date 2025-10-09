@@ -16,6 +16,7 @@ import AllEvents from "./pages/admin/AllEvents";
 import Stats from "./pages/admin/Stats";
 import NotFound from "./pages/NotFound";
 import SignUp from "./components/auth/SignUp";
+import OrgSignUp from "./components/auth/OrgSignUp";
 
 const queryClient = new QueryClient();
 
@@ -28,7 +29,12 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            {/* Support both /signup and /SignUp (case differences in existing links) */}
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/SignUp" element={<SignUp />} />
+            {/* Organization signup, also support legacy /OrgSignUp link */}
+            <Route path="/organization-signup" element={<OrgSignUp />} />
+            <Route path="/OrgSignUp" element={<OrgSignUp />} />
             <Route path="/search" element={<SearchEvents />} />
             <Route path="/my-events" element={<MyEvents />} />
             <Route path="/create-event" element={<CreateEvent />} />

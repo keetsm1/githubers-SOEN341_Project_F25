@@ -37,6 +37,38 @@ const EventCard: React.FC<EventCardProps> = ({
   isRSVPed = false
 }) => {
   const { user } = useAuth();
+  const [isStarring, setIsStarring] = React.useState(false);
+  const [isStarred, setIsStarred] = React.useState(false);
+
+  // Check if this event is already starred by the user on mount
+  React.useEffect(() => {
+    const checkStarred = async () => {
+      try {
+        const { db } = await import('@/services/database');
+        const starredEvents = await db.getStarredEvents();
+        setIsStarred(starredEvents.some(e => e.id === event.id));
+      } catch {}
+    };
+    checkStarred();
+  }, [event.id]);
+  const handleStarEvent = async () => {
+    setIsStarring(true);
+    try {
+      const { db } = await import('@/services/database');
+      if (isStarred) {
+        await db.unstarEvent(event.id);
+        setIsStarred(false);
+      } else {
+        await db.starEvent(event.id);
+        setIsStarred(true);
+      }
+      // Optionally show a toast or update local state
+    } catch (err) {
+      // Optionally handle error
+    } finally {
+      setIsStarring(false);
+    }
+  };
   
   const canManage = user?.role === 'admin' || 
     (user?.role === 'company' && event.organizerId === user.id) ||
@@ -164,9 +196,12 @@ const EventCard: React.FC<EventCardProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {/* Add to favorites */}}
+                onClick={handleStarEvent}
+                disabled={isStarring}
+                className={isStarred ? 'bg-blue-600' : 'bg-blue-200'}
+                title={isStarred ? 'Unstar this event' : 'Star this event'}
               >
-                <Star className="w-4 h-4" />
+                <Star className={`w-4 h-4 ${isStarred ? 'text-yellow-400 fill-yellow-400' : 'text-blue-500'}`} />
               </Button>
             </>
           )}

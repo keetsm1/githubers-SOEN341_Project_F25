@@ -291,8 +291,54 @@ async function declineFriendRequest(requestId: string): Promise<void> {
  *  (Events + Friends now use Supabase; others remain mocked)
  *  ────────────────────────────────────────────────────────────────────────── */
 export const db = {
+    // Unstar an event for the current user
+    unstarEvent: async (eventId: string): Promise<void> => {
+        const uid = await requireAuth();
+        if (!supabase) throw new Error('Supabase not configured');
+        const { error } = await supabase
+            .from('starred_events')
+            .delete()
+            .eq('user_id', uid)
+            .eq('event_id', eventId);
+        if (error) throw error;
+    },
+    // Get starred events for the current user
+    async getStarredEvents(): Promise<Event[]> {
+        const uid = await requireAuth();
+        if (!supabase) throw new Error('Supabase not configured');
+        const { data, error } = await supabase
+            .from('starred_events')
+            .select('event:events (event_id, title, description, starts_at, location, category, organizer_id, max_cap, image_url, tags, status, created_at, created_by)')
+            .eq('user_id', uid);
+        if (error) throw error;
+        return (data ?? []).map((row: any) => ({
+            id: row.event.event_id,
+            title: row.event.title,
+            description: row.event.description ?? '',
+            date: row.event.starts_at,
+            location: row.event.location ?? '',
+            category: row.event.category ?? 'General',
+            organizerId: row.event.organizer_id,
+            organizerName: '',
+            maxCapacity: row.event.max_cap ?? 0,
+            currentAttendees: 0,
+            imageUrl: row.event.image_url ?? undefined,
+            tags: row.event.tags ?? [],
+            isApproved: row.event.status === 'published',
+            createdAt: row.event.created_at,
+        }));
+    },
     /* ───────────── Events (Supabase-backed) ───────────── */
 
+        // Star an event for the current user
+        async starEvent(eventId: string): Promise<void> {
+            const uid = await requireAuth();
+            if (!supabase) throw new Error('Supabase not configured');
+            const { error } = await supabase
+                .from('starred_events')
+                .insert({ user_id: uid, event_id: eventId });
+            if (error) throw error;
+        },
     async createEvent(eventData: Omit<Event, 'id' | 'createdAt'>): Promise<Event> {
         const uid = await requireAuth();
 

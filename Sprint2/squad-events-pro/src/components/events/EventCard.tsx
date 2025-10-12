@@ -104,6 +104,18 @@ const EventCard: React.FC<EventCardProps> = ({
             </div>
           </div>
 
+          {/* Status line */}
+          <div className="flex items-center text-xs">
+            <span className="mr-2 text-muted-foreground">Status:</span>
+            {event.isApproved ? (
+              <Badge variant="outline" className="border-green-600 text-green-700">Approved</Badge>
+            ) : event.statusText === 'rejected' ? (
+              <Badge variant="outline" className="border-red-600 text-red-700">Rejected</Badge>
+            ) : (
+              <Badge variant="outline" className="border-yellow-600 text-yellow-700">{event.statusText ? event.statusText.charAt(0).toUpperCase() + event.statusText.slice(1) : 'Pending'}</Badge>
+            )}
+          </div>
+
           {/* Capacity Bar */}
           <div className="w-full bg-muted rounded-full h-2">
             <div

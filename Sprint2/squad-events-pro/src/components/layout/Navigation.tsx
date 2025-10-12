@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import path from 'path';
 
 const Navigation = () => {
   const { user, logout } = useAuth();
@@ -32,7 +33,6 @@ const Navigation = () => {
           { path: '/', label: 'Home', icon: Home },
           { path: '/search', label: 'Search Events', icon: Search },
           { path: '/my-events', label: 'My Events', icon: Calendar },
-          { path: '/create-event', label: 'Create Event', icon: Plus },
           { path: '/friends', label: 'Friends', icon: Users },
         ];
       case 'company':
@@ -45,6 +45,7 @@ const Navigation = () => {
         return [
           { path: '/dashboard', label: 'Dashboard', icon: Home },
           { path: '/approve-companies', label: 'Approve Companies', icon: UserCheck },
+          { path: '/approve-events', label: 'Approve Events', icon: Shield },
           { path: '/all-events', label: 'All Events', icon: Calendar },
           { path: '/stats', label: 'Statistics', icon: BarChart3 },
         ];

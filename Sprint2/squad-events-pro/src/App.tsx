@@ -17,6 +17,7 @@ import Stats from "./pages/admin/Stats";
 import NotFound from "./pages/NotFound";
 import SignUp from "./components/auth/SignUp";
 import OrgSignUp from "./components/auth/OrgSignUp";
+import ApproveEvents from "./pages/admin/ApproveEvents";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/approve-companies" element={<ApproveCompanies />} />
+            <Route path="/approve-events" element={<ApproveEvents />} />
             <Route path="/all-events" element={<AllEvents />} />
             <Route path="/stats" element={<Stats />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

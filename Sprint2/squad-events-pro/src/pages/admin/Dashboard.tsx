@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
+ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BarChart3, Users, Calendar, Shield } from 'lucide-react';
 import Navigation from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { db, Analytics } from '@/services/database';
+import { supabase, isSupabaseEnabled } from '@/lib/supabase';
 import LoginForm from '@/components/auth/LoginForm';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [totalEvents, setTotalEvents] = useState(0);
+  const [pendingEvents, setPendingEvents] = useState(0);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -22,6 +25,24 @@ const Dashboard = () => {
     try {
       const data = await db.getGlobalStats();
       setAnalytics(data);
+      
+      // Fetch real event counts from database
+      if (isSupabaseEnabled && supabase) {
+        // Count published events
+        const { count: publishedCount } = await supabase
+          .from('events')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'published');
+        
+        // Count pending events
+        const { count: pendingCount } = await supabase
+          .from('events')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', false);
+        
+        setTotalEvents(publishedCount || 0);
+        setPendingEvents(pendingCount || 0);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -73,7 +94,7 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Events</p>
-                    <p className="text-3xl font-bold text-primary">42</p>
+                    <p className="text-3xl font-bold text-primary">{totalEvents}</p>
                   </div>
                   <Calendar className="w-8 h-8 text-primary" />
                 </div>
@@ -109,7 +130,7 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Pending Approvals</p>
-                    <p className="text-3xl font-bold text-yellow-600">3</p>
+                    <p className="text-3xl font-bold text-yellow-600">{pendingEvents}</p>
                   </div>
                   <Shield className="w-8 h-8 text-yellow-600" />
                 </div>

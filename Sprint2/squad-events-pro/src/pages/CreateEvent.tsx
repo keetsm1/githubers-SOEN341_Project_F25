@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import { db } from '@/services/database';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import LoginForm from '@/components/auth/LoginForm';
-
+import { supabase, isSupabaseEnabled } from '@/lib/supabase';
 const categories = [
   'Technology', 'Career', 'Sports', 'Arts', 'Social', 'Academic', 'Business'
 ];
@@ -22,6 +22,7 @@ const CreateEvent = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
   
   const [formData, setFormData] = useState({
     title: '',
@@ -34,8 +35,11 @@ const CreateEvent = () => {
     tags: [] as string[]
   });
   
+  // Only organization accounts (company role) can create events
   const [newTag, setNewTag] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingApproval, setCheckingApproval] = useState(true);
+  const [approvalStatus, setApprovalStatus] = useState<'unknown' | 'approved' | 'pending' | 'rejected' | 'none'>('unknown');
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -62,8 +66,10 @@ const CreateEvent = () => {
     e.preventDefault();
     if (!user) return;
 
+
     setLoading(true);
     try {
+      
       const eventData = {
         title: formData.title,
         description: formData.description,
@@ -90,10 +96,11 @@ const CreateEvent = () => {
       
       navigate('/my-events');
     } catch (error) {
+      console.error('Create event failed', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create event. Please try again."
+        description: (error as any)?.message || "Failed to create event. Please try again."
       });
     } finally {
       setLoading(false);
@@ -104,7 +111,65 @@ const CreateEvent = () => {
     return <LoginForm />;
   }
 
-  if (user.role !== 'student' && user.role !== 'company' && user.role !== 'admin') {
+  // Fetch latest organization application status for this user (company)
+  useEffect(() => {
+    const run = async () => {
+      if (!isSupabaseEnabled || !supabase) {
+        setApprovalStatus('approved');
+        setCheckingApproval(false);
+        return;
+      }
+      if (!user || user.role !== 'company') {
+        setApprovalStatus('unknown');
+        setCheckingApproval(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('organization_applications')
+        .select('status, submitted_at')
+        .eq('applicant_user_id', user.id)
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        setApprovalStatus('unknown');
+      } else if (!data) {
+        setApprovalStatus('none');
+      } else {
+        const s = (data as { status: string }).status as 'approved' | 'pending' | 'rejected' | string;
+        if (s === 'approved') setApprovalStatus('approved');
+        else if (s === 'pending') setApprovalStatus('pending');
+        else if (s === 'rejected') setApprovalStatus('rejected');
+        else setApprovalStatus('unknown');
+      }
+      setCheckingApproval(false);
+    };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    run();
+  }, [user]);
+
+  if (checkingApproval) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="p-8 text-center">Checking organization approval…</CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  //only orgs can create events.
+  if (user.role !== 'company' || approvalStatus !== 'approved') {
+    let message = 'Only organization (company) accounts can create events.';
+    if (user.role === 'company') {
+      if (approvalStatus === 'pending') message = 'Your organization application is pending approval. You can create events once approved.';
+      else if (approvalStatus === 'rejected') message = 'Your organization application was rejected. Please contact an administrator for more information.';
+      else if (approvalStatus === 'none') message = 'No organization application found. Please submit an application to proceed.';
+      else if (approvalStatus === 'unknown') message = 'We could not verify your organization approval at this time.';
+    }
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
@@ -112,9 +177,7 @@ const CreateEvent = () => {
           <Card>
             <CardContent className="p-8 text-center">
               <h2 className="text-2xl font-bold mb-4">Access Restricted</h2>
-              <p className="text-muted-foreground">
-                You don't have permission to create events.
-              </p>
+              <p className="text-muted-foreground">{message}</p>
             </CardContent>
           </Card>
         </div>
@@ -294,13 +357,11 @@ const CreateEvent = () => {
                 </Button>
               </div>
 
-              {user.role !== 'admin' && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Note:</strong> Your event will be submitted for admin approval before it becomes visible to students.
-                  </p>
-                </div>
-              )}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> Your event will be submitted for admin approval before it becomes visible to students.
+                </p>
+              </div>
             </form>
           </CardContent>
         </Card>

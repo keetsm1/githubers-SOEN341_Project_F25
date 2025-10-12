@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+
 import Index from "./pages/Index";
 import SearchEvents from "./pages/SearchEvents";
 import MyEvents from "./pages/MyEvents";
@@ -19,40 +20,51 @@ import SignUp from "./components/auth/SignUp";
 import OrgSignUp from "./components/auth/OrgSignUp";
 import ApproveEvents from "./pages/admin/ApproveEvents";
 
+// NEW: edit page route
+import EditEvent from "./pages/EditEvent";
+
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            {/* Support both /signup and /SignUp (case differences in existing links) */}
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/SignUp" element={<SignUp />} />
-            {/* Organization signup, also support legacy /OrgSignUp link */}
-            <Route path="/organization-signup" element={<OrgSignUp />} />
-            <Route path="/OrgSignUp" element={<OrgSignUp />} />
-            <Route path="/search" element={<SearchEvents />} />
-            <Route path="/my-events" element={<MyEvents />} />
-            <Route path="/create-event" element={<CreateEvent />} />
-            <Route path="/friends" element={<Friends />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/approve-companies" element={<ApproveCompanies />} />
-            <Route path="/approve-events" element={<ApproveEvents />} />
-            <Route path="/all-events" element={<AllEvents />} />
-            <Route path="/stats" element={<Stats />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+            <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                    <Routes>
+                        <Route path="/" element={<Index />} />
+                        {/* Support both /signup and /SignUp (case differences in existing links) */}
+                        <Route path="/signup" element={<SignUp />} />
+                        <Route path="/SignUp" element={<SignUp />} />
+                        {/* Organization signup, also support legacy /OrgSignUp link */}
+                        <Route path="/organization-signup" element={<OrgSignUp />} />
+                        <Route path="/OrgSignUp" element={<OrgSignUp />} />
+
+                        <Route path="/search" element={<SearchEvents />} />
+                        <Route path="/my-events" element={<MyEvents />} />
+                        <Route path="/create-event" element={<CreateEvent />} />
+
+                        {/* NEW: editing pending events */}
+                        <Route path="/events/:id/edit" element={<EditEvent />} />
+
+                        <Route path="/friends" element={<Friends />} />
+                        <Route path="/analytics" element={<Analytics />} />
+
+                        {/* Admin */}
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/approve-companies" element={<ApproveCompanies />} />
+                        <Route path="/approve-events" element={<ApproveEvents />} />
+                        <Route path="/all-events" element={<AllEvents />} />
+                        <Route path="/stats" element={<Stats />} />
+
+                        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                        <Route path="*" element={<NotFound />} />
+                    </Routes>
+                </BrowserRouter>
+            </TooltipProvider>
+        </AuthProvider>
+    </QueryClientProvider>
 );
 
 export default App;

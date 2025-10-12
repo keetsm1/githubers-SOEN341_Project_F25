@@ -67,7 +67,7 @@
   </tr>
   <tr>
     <td>3</td>
-    <td>Ranjit provided the complete project directory with the database creation code right after the meeting. The code was found to be hardcoded and will need to be refactored for proper configuration and integration practices.</td>
+    <td>Ranjit provided the complete project directory with the fundamental codebase. The code was found to be hardcoded and will need to be refactored for proper configuration and integration practices.</td>
   </tr>
 </table>
 
@@ -119,5 +119,6 @@
 
 
   
+
 
 

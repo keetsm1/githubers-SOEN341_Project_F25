@@ -1,6 +1,3 @@
-// Database Service Layer – Supabase-backed implementation
-// Adds filterable event listing + org/category helpers while keeping existing interfaces.
-
 import { createClient } from '@supabase/supabase-js';
 
 /** ──────────────────────────────────────────────────────────────────────────
@@ -178,6 +175,53 @@ export type EventFilters = {
     sort?: 'soonest' | 'newest' | 'popularity';
 };
 
+export type EventInsert = {
+    org_id: string;
+    title: string;
+    description?: string | null;
+    starts_at: string; // ISO
+    ends_at: string;   // ISO
+    location?: string | null;
+    max_cap?: number | null;
+    image_url?: string | null;
+    status?: 'draft' | 'published' | 'cancelled';
+    category?: string | null;
+    tags?: string[] | null;
+    // ticket_type?: 'free' | 'paid' | 'rsvp' // if you add later
+};
+
+export type EventRow = {
+    event_id: string;
+    title: string;
+    description: string | null;
+    starts_at: string;
+    ends_at: string;
+    location: string | null;
+    category: string | null;
+    max_cap: number | null;
+    image_url: string | null;
+    tags: string[] | null;
+    status: 'pending' | 'published' | 'cancelled';
+    created_by: string;
+    org_name?: string | null;
+};
+
+// Narrow update payload (all optional)
+export type EventUpdate = Partial<
+    Pick<
+        EventRow,
+        | 'title'
+        | 'description'
+        | 'starts_at'
+        | 'ends_at'
+        | 'location'
+        | 'category'
+        | 'max_cap'
+        | 'image_url'
+        | 'tags'
+    >
+>;
+
 // Helper for pages: list orgs (id+name) for menus
 export async function listOrganizationsBasic(): Promise<{ org_id: string; name: string }[]> {
     if (!supabase) return [];
@@ -263,6 +307,66 @@ export async function listEvents(filters: EventFilters = {}): Promise<Event[]> {
         isApproved: ev.status === 'published',
         createdAt: ev.created_at,
     })) as Event[];
+}
+
+export async function createEvent(input: EventInsert) {
+    const { data, error } = await supabase
+        .from('events')
+        .insert(input)
+        .select('*')         // IMPORTANT: return the inserted row
+        .single();
+
+    if (error) throw error;
+    return data; // the new event row (includes event_id)
+}
+
+// Get a single event by id
+export async function getEventById(eventId: string) {
+    const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('event_id', eventId)
+        .single();
+
+    if (error) throw error;
+    return data as EventRow;
+}
+
+/**
+ * Update a pending event that belongs to a user.
+ * Server-side RLS should enforce ownership & pending status;
+ * the client filter is added here for defense in depth.
+ */
+export async function updateEventPendingOwned(
+    eventId: string,
+    userId: string,
+    patch: EventUpdate
+) {
+    const { data, error } = await supabase
+        .from('events')
+        .update(patch)
+        .eq('event_id', eventId)
+        .eq('created_by', userId)
+        .eq('status', 'pending')
+        .select('*')
+        .single();
+
+    if (error) throw error;
+    return data as EventRow;
+}
+
+export async function deleteEventPendingOwned(eventId: string, userId: string) {
+    const { data, error } = await supabase
+        .from('events')
+        .delete()
+        .eq('event_id', eventId)
+        .eq('created_by', userId)
+        .eq('status', 'pending')
+        .select('event_id')
+        .single();
+
+    if (error) throw error;
+    return data;
 }
 
 /** ──────────────────────────────────────────────────────────────────────────

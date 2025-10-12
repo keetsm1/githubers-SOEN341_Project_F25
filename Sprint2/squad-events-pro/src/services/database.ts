@@ -115,6 +115,8 @@ export interface Event {
     imageUrl?: string;
     tags: string[];
     isApproved: boolean;
+    // Derived UI status for display
+    statusText?: 'approved' | 'pending' | 'rejected';
     createdAt: string;
 }
 
@@ -425,46 +427,86 @@ export const db = {
     },
 
         // Star an event for the current user
-        async starEvent(eventId: string): Promise<void> {
-            const uid = await requireAuth();
-            if (!supabase) throw new Error('Supabase not configured');
-            const { error } = await supabase
-                .from('starred_events')
-                .insert({ user_id: uid, event_id: eventId });
-            if (error) throw error;
-        },
     async createEvent(eventData: Omit<Event, 'id' | 'createdAt'>): Promise<Event> {
         const uid = await requireAuth();
 
+        // Enforce role check via profiles
+        if (!supabase) throw new Error('Supabase not configured');
+        const { data: prof } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('user_id', uid)
+            .maybeSingle();
+
+        const role = (prof as any)?.role ?? 'student';
+        if (role === 'student') {
+            throw new Error('Students are not permitted to create events.');
+        }
+
+        // Resolve organization for this user (if any) to set org_id and org_name
+        let orgId: string | null = null;
+        let orgName: string | null = null;
+        if (supabase) {
+            const { data: org } = await supabase
+                .from('organizations')
+                .select('org_id, name, approved_at')
+                .eq('owner_user_id', uid)
+                .order('approved_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (org) {
+                orgId = (org as any).org_id ?? null;
+                orgName = (org as any).name ?? null;
+            }
+        }
+
+        // If the user is a company, ensure we have an organization to attach
+        if (role === 'company' && !orgId) {
+            throw new Error('No approved organization found for your account. Please wait for approval or contact an administrator.');
+        }
+
+        // Map UI -> DB
         const startsAt = eventData.date;
         const endsAt = new Date(new Date(eventData.date).getTime() + 2 * 60 * 60 * 1000).toISOString();
 
         const payload = {
-            org_id: null, // student-created event
+            org_id: role === 'company' ? orgId : null,
             created_by: uid,
             title: eventData.title,
             description: eventData.description ?? null,
             starts_at: startsAt,
             ends_at: endsAt,
             location: eventData.location ?? null,
-            max_cap: eventData.maxCapacity ?? null,
+            max_cap: Number.isFinite(eventData.maxCapacity as number)
+                ? (eventData.maxCapacity as number)
+                : null,
             image_url: eventData.imageUrl ?? null,
-            status: eventData.isApproved ? 'published' : 'draft',
-            category: eventData.category ?? null,
+            status: false,
+            // New columns added to events: category and org_name
+            category: (eventData.tags && eventData.tags.length > 0)
+                ? eventData.tags.join(',')
+                : (eventData.category || 'General'),
+            org_name: orgName ?? eventData.organizerName ?? null,
+            created_at: new Date().toISOString(),
         };
-
         if (!supabase) throw new Error('Supabase not configured');
         const { data, error } = await supabase
             .from('events')
             .insert(payload)
             .select(`
         event_id, title, description, starts_at, ends_at, location,
-        max_cap, image_url, status, created_at, created_by, category
+        max_cap, image_url, status, created_at, created_by, org_id, category, org_name
       `)
             .single();
 
-        if (error) throw error;
+        if (error) {
+            // Surface details in the browser console for debugging
+            // eslint-disable-next-line no-console
+            console.error('Supabase insert events failed:', error, { payload });
+            throw error;
+        }
 
+        // Map DB -> UI
         return {
             id: data.event_id,
             title: data.title,
@@ -473,12 +515,13 @@ export const db = {
             location: data.location ?? '',
             category: data.category ?? (eventData.category || 'General'),
             organizerId: data.created_by,
-            organizerName: eventData.organizerName,
+            organizerName: data.org_name ?? eventData.organizerName,
             maxCapacity: data.max_cap ?? 0,
             currentAttendees: 0,
             imageUrl: data.image_url ?? undefined,
             tags: eventData.tags ?? [],
-            isApproved: data.status === 'published',
+            isApproved: Boolean(data.status),
+            statusText: (Boolean(data.status) ? 'approved' : 'pending') as 'approved' | 'pending' | 'rejected',
             createdAt: data.created_at,
         };
     },
@@ -498,16 +541,22 @@ export const db = {
         let query = supabase.from('events').select(
             `
         event_id, title, description, starts_at, ends_at, location,
-        max_cap, image_url, status, created_at, created_by, org_id, category
+        max_cap, image_url, status, created_at, created_by, org_id, category, org_name
       `,
             { count: 'exact' }
         );
 
         if (filters?.organizerId) {
-            query = query.eq('created_by', filters.organizerId).is('org_id', null);
+            query = query.eq('created_by', filters.organizerId);
         }
         if (filters?.approved !== undefined) {
-            query = query.eq('status', filters.approved ? 'published' : 'draft');
+            if (filters.approved) {
+                // Query for published events (string status)
+                query = query.eq('status', 'published');
+            } else {
+                // Query for non-published events (false, draft, rejected, etc.)
+                query = query.neq('status', 'published');
+            }
         }
         if (filters?.search) {
             query = query.ilike('title', `%${filters.search}%`);
@@ -527,22 +576,48 @@ export const db = {
 
         if (error) throw error;
 
-        const mapped = (data ?? []).map((ev: any) => ({
-            id: ev.event_id,
-            title: ev.title,
-            description: ev.description ?? '',
-            date: ev.starts_at,
-            location: ev.location ?? '',
-            category: ev.category ?? (filters?.category ?? 'General'),
-            organizerId: ev.created_by,
-            organizerName: 'You',
-            maxCapacity: ev.max_cap ?? 0,
-            currentAttendees: 0,
-            imageUrl: ev.image_url ?? undefined,
-            tags: [],
-            isApproved: ev.status === 'published',
-            createdAt: ev.created_at,
-        }));
+        const mapped = (data ?? []).map((ev: any) => {
+            const raw = ev.status;
+            let isApproved: boolean;
+            let statusText: 'approved' | 'pending' | 'rejected';
+
+            if (typeof raw === 'boolean') {
+                isApproved = raw;
+                statusText = raw ? 'approved' : 'pending';
+            } else if (typeof raw === 'string') {
+                if (raw.toLowerCase() === 'rejected') {
+                    isApproved = false;
+                    statusText = 'rejected';
+                } else if (raw.toLowerCase() === 'published' || raw.toLowerCase() === 'approved') {
+                    isApproved = true;
+                    statusText = 'approved';
+                } else {
+                    isApproved = false;
+                    statusText = 'pending';
+                }
+            } else {
+                isApproved = false;
+                statusText = 'pending';
+            }
+
+            return {
+                id: ev.event_id,
+                title: ev.title,
+                description: ev.description ?? '',
+                date: ev.starts_at,
+                location: ev.location ?? '',
+                category: ev.category ?? filters?.category ?? 'General',
+                organizerId: ev.created_by,
+                organizerName: ev.org_name ?? 'You',
+                maxCapacity: ev.max_cap ?? 0,
+                currentAttendees: 0,
+                imageUrl: ev.image_url ?? undefined,
+                tags: [],
+                isApproved,
+                statusText,
+                createdAt: ev.created_at,
+            } as Event;
+        });
 
         return {
             data: mapped,

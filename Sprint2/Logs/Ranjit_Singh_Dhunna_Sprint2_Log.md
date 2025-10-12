@@ -1,4 +1,4 @@
-# Ranjit Singh Dhunna - Sprint 1 Contribution Log
+# Ranjit Singh Dhunna - Sprint 2 Contribution Log
 
 | Date       | Task                     | Time Spent | Notes |
 |------------|--------------------------|------------|-------|
@@ -14,3 +14,4 @@
 | 2025-10-03 | Task.6.3                 | 5 hrs      | Event saving functionality with persistent storage |
 | 2025-10-04 | Task.6.5                 | 3 hrs      | Error handling and user feedback system |
 | 2025-10-05 | Task.7.3                 | 7 hrs      | Complete "My Events" page with save/remove functionality |
+

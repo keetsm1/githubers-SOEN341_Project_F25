@@ -16,12 +16,13 @@ import Navigation from '@/components/layout/Navigation';
 import EventCard from '@/components/events/EventCard';
 import LoginForm from '@/components/auth/LoginForm';
 import { useAuth } from '@/contexts/AuthContext';
-import { db, Event } from '@/services/database';
+import { db, Event, listEvents } from '@/services/database';
 
 const Index = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
+  const [todaysEvents, setTodaysEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,8 +33,21 @@ const Index = () => {
 
   const loadDashboardData = async () => {
     try {
+      // Latest published events for the Trending section
       const eventsResponse = await db.getEvents({ limit: 6, approved: true });
       setUpcomingEvents(eventsResponse.data);
+
+      // Today's schedule from Supabase (published events whose starts_at falls today)
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      const todays = await listEvents({
+        dateFrom: start.toISOString(),
+        dateTo: end.toISOString(),
+        sort: 'soonest',
+      });
+      setTodaysEvents(todays);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -197,7 +211,7 @@ const Index = () => {
           )}
         </div>
 
-        {/* Today's Schedule */}
+        {/* Today's Schedule (dynamic) */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -206,35 +220,50 @@ const Index = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-primary rounded-full" />
-                  <div>
-                    <p className="font-medium">AI Workshop</p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      Engineering Building, Room 201
-                    </p>
+            {loading ? (
+              <div className="space-y-4">
+                {[...Array(2)].map((_, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="w-3 h-3 bg-muted rounded-full" />
+                      <div className="flex-1">
+                        <div className="h-4 bg-muted rounded w-1/2 mb-2" />
+                        <div className="h-3 bg-muted rounded w-1/3" />
+                      </div>
+                    </div>
+                    <div className="h-6 w-16 bg-muted rounded" />
                   </div>
-                </div>
-                <Badge>6:00 PM</Badge>
+                ))}
               </div>
-              
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-accent rounded-full" />
-                  <div>
-                    <p className="font-medium">Study Group Meeting</p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      Library, Study Room 3
-                    </p>
+            ) : todaysEvents.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">
+                No events scheduled for today. <button className="underline" onClick={() => navigate('/search')}>Browse all events</button>.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {todaysEvents.map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+                    onClick={() => navigate('/search')}
+                    role="button"
+                    aria-label={`View ${ev.title} in events`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-primary rounded-full" />
+                      <div>
+                        <p className="font-medium">{ev.title}</p>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {ev.location}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge>{new Date(ev.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Badge>
                   </div>
-                </div>
-                <Badge variant="outline">8:00 PM</Badge>
+                ))}
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,17 +1,14 @@
 // Database Service Layer – Supabase-backed implementation
-// Replaces mock calls for Events & Friends, keeps your interfaces intact.
+// Adds filterable event listing + org/category helpers while keeping existing interfaces.
 
 import { createClient } from '@supabase/supabase-js';
 
 /** ──────────────────────────────────────────────────────────────────────────
- *  Supabase client boot
- *  (supports Vite and Node-ish envs you already had)
+ *  Supabase client boot (Vite / Node-ish)
  *  ────────────────────────────────────────────────────────────────────────── */
 const viteEnv = (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
 const nodeEnv =
-    typeof process !== 'undefined' && (process as any).env
-        ? (process as any).env
-        : {};
+    typeof process !== 'undefined' && (process as any).env ? (process as any).env : {};
 
 const supaBaseUrl: string =
     viteEnv.VITE_SUPABASE_URL ||
@@ -27,15 +24,12 @@ export const isSupabaseEnabled = !!(supaBaseUrl && supabaseAnonKey);
 
 export const supabase = isSupabaseEnabled
     ? createClient(supaBaseUrl as string, supabaseAnonKey as string, {
-        auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-        },
+        auth: { persistSession: true, autoRefreshToken: true },
     })
     : null;
 
 /** ──────────────────────────────────────────────────────────────────────────
- *  Auth helpers (your existing auth kept; added ensureProfile)
+ *  Auth helpers (kept behavior; added ensureProfile)
  *  ────────────────────────────────────────────────────────────────────────── */
 export const auth = {
     async signUp(email: string, password: string, fullName: string) {
@@ -44,12 +38,9 @@ export const auth = {
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
-            options: {
-                data: { full_name: fullName },
-            },
+            options: { data: { full_name: fullName } },
         });
 
-        // Ensure a profile row exists (optional but recommended for RLS)
         const userId = data.user?.id;
         if (userId) {
             await ensureProfile(userId, fullName, email).catch(() => {});
@@ -70,12 +61,8 @@ export const auth = {
 
         const e = email.trim().toLowerCase();
         const p = password.trim();
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: e,
-            password: p,
-        });
+        const { data, error } = await supabase.auth.signInWithPassword({ email: e, password: p });
 
-        // Ensure a profile row exists
         const userId = data.user?.id;
         if (userId) {
             const fullName = (data.user?.user_metadata as any)?.full_name ?? null;
@@ -112,7 +99,7 @@ export async function ensureProfile(userId: string, fullName?: string, email?: s
 }
 
 /** ──────────────────────────────────────────────────────────────────────────
- *  App-level interfaces (kept from your file)
+ *  App-level interfaces (kept)
  *  ────────────────────────────────────────────────────────────────────────── */
 export interface Event {
     id: string;
@@ -142,7 +129,7 @@ export interface Ticket {
 }
 
 export interface Friendship {
-    id: string;           // request_id for requests, or composed key for friendships
+    id: string; // request_id for requests, or composed key for friendships
     userId: string;
     friendId: string;
     status: 'pending' | 'accepted' | 'rejected';
@@ -178,6 +165,105 @@ export interface Analytics {
 }
 
 /** ──────────────────────────────────────────────────────────────────────────
+ *  New: Filter types + helpers for event listing
+ *  ────────────────────────────────────────────────────────────────────────── */
+export type EventFilters = {
+    q?: string;                 // free text (title/description)
+    categories?: string[];      // events.category IN (...)
+    orgIds?: string[];          // events.org_id IN (...)
+    dateFrom?: string;          // ISO
+    dateTo?: string;            // ISO
+    sort?: 'soonest' | 'newest' | 'popularity';
+};
+
+// Helper for pages: list orgs (id+name) for menus
+export async function listOrganizationsBasic(): Promise<{ org_id: string; name: string }[]> {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+        .from('organizations')
+        .select('org_id,name')
+        .eq('status', 'approved')
+        .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data ?? [];
+}
+
+// Helper for pages: distinct categories
+export async function listEventCategories(): Promise<string[]> {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+        .from('events')
+        .select('category')
+        .not('category', 'is', null);
+
+    if (error) throw error;
+
+    const set = new Set<string>();
+    (data ?? []).forEach((r: any) => r?.category && set.add(r.category));
+    return [...set].sort();
+}
+
+// Core: filterable events (AND-logic; integrates search + sort)
+export async function listEvents(filters: EventFilters = {}): Promise<Event[]> {
+    if (!supabase) throw new Error('Supabase not configured');
+
+    const { q, categories, orgIds, dateFrom, dateTo, sort } = filters;
+
+    let query = supabase
+        .from('events')
+        .select(
+            `event_id, org_id, title, description, starts_at, ends_at, location,
+       max_cap, image_url, status, created_at, created_by, category`
+        )
+        .eq('status', 'published');
+
+    if (categories?.length) query = query.in('category', categories);
+    if (orgIds?.length)     query = query.in('org_id', orgIds);
+    if (dateFrom)           query = query.gte('starts_at', dateFrom);
+    if (dateTo)             query = query.lte('starts_at', dateTo);
+
+    if (q && q.trim()) {
+        const like = `%${q.trim()}%`;
+        query = query.or(`title.ilike.${like},description.ilike.${like}`);
+    }
+
+    switch (sort) {
+        case 'newest':
+            query = query.order('created_at', { ascending: false });
+            break;
+        case 'popularity':
+            // Placeholder: if you later add popularity_score, order by it here.
+            query = query.order('starts_at', { ascending: true });
+            break;
+        case 'soonest':
+        default:
+            query = query.order('starts_at', { ascending: true });
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    // Map DB → UI Event
+    return (data ?? []).map((ev: any) => ({
+        id: ev.event_id,
+        title: ev.title,
+        description: ev.description ?? '',
+        date: ev.starts_at,
+        location: ev.location ?? '',
+        category: ev.category ?? 'General',
+        organizerId: ev.created_by,
+        organizerName: ev.org_id ? 'Organization' : 'Student',
+        maxCapacity: ev.max_cap ?? 0,
+        currentAttendees: 0, // wire to registrations count later
+        imageUrl: ev.image_url ?? undefined,
+        tags: [],
+        isApproved: ev.status === 'published',
+        createdAt: ev.created_at,
+    })) as Event[];
+}
+
+/** ──────────────────────────────────────────────────────────────────────────
  *  Local helpers
  *  ────────────────────────────────────────────────────────────────────────── */
 async function requireAuth() {
@@ -189,7 +275,6 @@ async function requireAuth() {
 }
 
 // Look up a user_id from an email mirrored into profiles.email
-// If you don't have profiles.email, change this to whatever identifier you store.
 async function lookupUserIdByEmail(email: string): Promise<string | null> {
     if (!supabase) return null;
     const e = email.trim().toLowerCase();
@@ -205,7 +290,7 @@ async function lookupUserIdByEmail(email: string): Promise<string | null> {
 }
 
 /** ──────────────────────────────────────────────────────────────────────────
- *  Mock seed you had (kept for non-Supabase functions & fallbacks)
+ *  Mock seed retained for update/delete fallbacks
  *  ────────────────────────────────────────────────────────────────────────── */
 const mockEvents: Event[] = [
     {
@@ -242,8 +327,9 @@ const mockEvents: Event[] = [
     },
 ];
 
-// ───────────── Incoming Friend Requests (Supabase) ─────────────
-
+/** ──────────────────────────────────────────────────────────────────────────
+ *  Friend Requests (Supabase)
+ *  ────────────────────────────────────────────────────────────────────────── */
 async function getIncomingFriendRequests(): Promise<IncomingFriendRequest[]> {
     if (!supabase) throw new Error('Supabase not configured');
     const uid = await requireAuth();
@@ -288,7 +374,7 @@ async function declineFriendRequest(requestId: string): Promise<void> {
 
 /** ──────────────────────────────────────────────────────────────────────────
  *  db: Events, Tickets, Friends, Companies, Analytics
- *  (Events + Friends now use Supabase; others remain mocked)
+ *  (Events list now uses new listEvents in the page; these remain for compatibility)
  *  ────────────────────────────────────────────────────────────────────────── */
 export const db = {
     // Unstar an event for the current user
@@ -328,7 +414,15 @@ export const db = {
             createdAt: row.event.created_at,
         }));
     },
-    /* ───────────── Events (Supabase-backed) ───────────── */
+    // Star an event for the current user
+    async starEvent(eventId: string): Promise<void> {
+        const uid = await requireAuth();
+        if (!supabase) throw new Error('Supabase not configured');
+        const { error } = await supabase
+            .from('starred_events')
+            .insert({ user_id: uid, event_id: eventId });
+        if (error) throw error;
+    },
 
         // Star an event for the current user
         async starEvent(eventId: string): Promise<void> {
@@ -342,7 +436,6 @@ export const db = {
     async createEvent(eventData: Omit<Event, 'id' | 'createdAt'>): Promise<Event> {
         const uid = await requireAuth();
 
-        // Map UI -> DB
         const startsAt = eventData.date;
         const endsAt = new Date(new Date(eventData.date).getTime() + 2 * 60 * 60 * 1000).toISOString();
 
@@ -357,6 +450,7 @@ export const db = {
             max_cap: eventData.maxCapacity ?? null,
             image_url: eventData.imageUrl ?? null,
             status: eventData.isApproved ? 'published' : 'draft',
+            category: eventData.category ?? null,
         };
 
         if (!supabase) throw new Error('Supabase not configured');
@@ -365,24 +459,23 @@ export const db = {
             .insert(payload)
             .select(`
         event_id, title, description, starts_at, ends_at, location,
-        max_cap, image_url, status, created_at, created_by
+        max_cap, image_url, status, created_at, created_by, category
       `)
             .single();
 
         if (error) throw error;
 
-        // Map DB -> UI
         return {
             id: data.event_id,
             title: data.title,
             description: data.description ?? '',
             date: data.starts_at,
             location: data.location ?? '',
-            category: eventData.category, // UI-level field (not yet in DB)
+            category: data.category ?? (eventData.category || 'General'),
             organizerId: data.created_by,
-            organizerName: eventData.organizerName, // UI-level field
+            organizerName: eventData.organizerName,
             maxCapacity: data.max_cap ?? 0,
-            currentAttendees: 0, // fill from registrations later
+            currentAttendees: 0,
             imageUrl: data.image_url ?? undefined,
             tags: eventData.tags ?? [],
             isApproved: data.status === 'published',
@@ -390,6 +483,7 @@ export const db = {
         };
     },
 
+    // Legacy-style list with simple search/paging (kept for other screens)
     async getEvents(filters?: {
         limit?: number;
         page?: number;
@@ -404,7 +498,7 @@ export const db = {
         let query = supabase.from('events').select(
             `
         event_id, title, description, starts_at, ends_at, location,
-        max_cap, image_url, status, created_at, created_by, org_id
+        max_cap, image_url, status, created_at, created_by, org_id, category
       `,
             { count: 'exact' }
         );
@@ -417,6 +511,9 @@ export const db = {
         }
         if (filters?.search) {
             query = query.ilike('title', `%${filters.search}%`);
+        }
+        if (filters?.category) {
+            query = query.eq('category', filters.category);
         }
 
         const page = filters?.page || 1;
@@ -436,7 +533,7 @@ export const db = {
             description: ev.description ?? '',
             date: ev.starts_at,
             location: ev.location ?? '',
-            category: filters?.category ?? 'General',
+            category: ev.category ?? (filters?.category ?? 'General'),
             organizerId: ev.created_by,
             organizerName: 'You',
             maxCapacity: ev.max_cap ?? 0,
@@ -454,7 +551,7 @@ export const db = {
     },
 
     async updateEvent(id: string, updates: Partial<Event>): Promise<Event> {
-        // Keep mocked for now (wire later if needed)
+        // Kept mocked for now
         const eventIndex = mockEvents.findIndex((e) => e.id === id);
         if (eventIndex >= 0) {
             mockEvents[eventIndex] = { ...mockEvents[eventIndex], ...updates };
@@ -464,7 +561,7 @@ export const db = {
     },
 
     async deleteEvent(id: string): Promise<void> {
-        // Keep mocked for now
+        // Kept mocked for now
         const eventIndex = mockEvents.findIndex((e) => e.id === id);
         if (eventIndex >= 0) mockEvents.splice(eventIndex, 1);
     },
@@ -500,8 +597,6 @@ export const db = {
 
     /* ───────────── Friends (Supabase-backed) ───────────── */
 
-    // Note: UI passes (currentUserId, email). We ignore currentUserId and
-    // take the session user per RLS; second arg is treated as the friend's email.
     async sendFriendRequest(currentUserId: string, friendIdentifier: string): Promise<Friendship> {
         const uid = await requireAuth();
         const addresseeId = await lookupUserIdByEmail(friendIdentifier);
@@ -525,7 +620,7 @@ export const db = {
         };
     },
 
-    // Expects a friend REQUEST id (from friend_requests), not a friendship id.
+    // Expects a friend REQUEST id
     async acceptFriendRequest(friendshipOrRequestId: string): Promise<Friendship> {
         await requireAuth();
         if (!supabase) throw new Error('Supabase not configured');
@@ -544,7 +639,6 @@ export const db = {
         };
     },
 
-    // Returns accepted friendships where the current user is user_id
     async getFriends(userId: string): Promise<Friendship[]> {
         const uid = await requireAuth();
         if (!supabase) throw new Error('Supabase not configured');
@@ -557,7 +651,7 @@ export const db = {
         if (error) throw error;
 
         return (data ?? []).map((row: any) => ({
-            id: `${row.user_id}_${row.friend_id}`, // composed
+            id: `${row.user_id}_${row.friend_id}`,
             userId: row.user_id,
             friendId: row.friend_id,
             status: 'accepted',
@@ -565,12 +659,10 @@ export const db = {
         }));
     },
 
-    // Events created by my friends (student-created, published)
     async getFriendsEvents(userId: string): Promise<Event[]> {
         const uid = await requireAuth();
         if (!supabase) throw new Error('Supabase not configured');
 
-        // 1) friend IDs
         const { data: friendRows, error: fErr } = await supabase
             .from('friendships')
             .select('friend_id')
@@ -580,12 +672,11 @@ export const db = {
         const friendIds = (friendRows ?? []).map((r) => r.friend_id);
         if (friendIds.length === 0) return [];
 
-        // 2) their published events (org-less == student events)
         const { data: events, error: eErr } = await supabase
             .from('events')
             .select(`
         event_id, title, description, starts_at, ends_at, location,
-        max_cap, image_url, status, created_at, created_by
+        max_cap, image_url, status, created_at, created_by, category
       `)
             .in('created_by', friendIds)
             .eq('status', 'published')
@@ -599,7 +690,7 @@ export const db = {
             description: ev.description ?? '',
             date: ev.starts_at,
             location: ev.location ?? '',
-            category: 'Social', // not modeled; pick a default
+            category: ev.category ?? 'Social',
             organizerId: ev.created_by,
             organizerName: 'Friend',
             maxCapacity: ev.max_cap ?? 0,
@@ -611,7 +702,7 @@ export const db = {
         }));
     },
 
-    // ✅ Export the two new functions so the Friends page can call them
+    // Expose friend-request helpers for the Friends page
     getIncomingFriendRequests,
     declineFriendRequest,
 

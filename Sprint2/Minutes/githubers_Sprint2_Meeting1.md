@@ -31,7 +31,7 @@
         </tr>
         <tr>
           <td>Present</td>
-          <td>Ranjit,Saad,Lorne,Arnav,Kevin,Gunkeet</td>
+          <td>Ranjit, Saad, Lorne, Arnav, Kevin, Gunkeet</td>
         </tr>
         <tr>
           <td>Absent</td>
@@ -59,15 +59,15 @@
   </tr>
   <tr>
     <td>1</td>
-    <td>Completed a team poll to assign role preferences across Front-end, Back-end, Documentation, Database, and DevOps</td>
+    <td>Completed a team poll to assign role preferences across Front-end, Back-end, Documentation, Database, and DevOps.</td>
   </tr>
   <tr>
     <td>2</td>
-    <td>Agreed on Sprint 2 scope, including UI mockups, authentication, database setup and UI features</td>
+    <td>Agreed on Sprint 2 scope, including UI mockups, authentication, database setup, and UI features.</td>
   </tr>
   <tr>
     <td>3</td>
-    <td>Laid out the assigned tasks for UI design and event creation functionality</td>
+    <td>Ranjit provided the complete project directory with the database creation code right after the meeting. The code was found to be hardcoded and will need to be refactored for proper configuration and integration practices.</td>
   </tr>
 </table>
 
@@ -79,30 +79,45 @@
     <th>Status</th>
   </tr>
   <tr>
-    <td>Implement login and signup functionality using Supabase</td>
-    <td>Gunkeet</td>
-    <td>In Progress</td>
+    <td>Provide complete project directory with database creation code</td>
+    <td>Ranjit</td>
+    <td>Completed (right after meeting)</td>
   </tr>
   <tr>
-    <td>Set up and manage database structure</td>
+    <td>Refactor hardcoded database creation code to use environment variables and configuration files</td>
+    <td>Gunkeet & Ranjit</td>
+    <td>Ongoing</td>
+  </tr>
+  <tr>
+    <td>Integrate updated database logic with Supabase backend</td>
     <td>Gunkeet</td>
-    <td>In Progress</td>
+    <td>Ongoing</td>
   </tr>
   <tr>
     <td>Design UI mockups</td>
     <td>Everyone</td>
-    <td>Pending</td>
+    <td>Ongoing</td>
   </tr>
   <tr>
     <td>Implement simple UI components</td>
     <td>Everyone</td>
-    <td>Pending</td>
+    <td>Ongoing</td>
   </tr>
   <tr>
     <td>Update contribution logs throughout Sprint 2</td>
     <td>Everyone</td>
     <td>Ongoing</td>
   </tr>
+  <tr>
+    <td>Follow up with team to get informed on meeting discussions and assigned responsibilities</td>
+    <td>Wijdane</td>
+    <td>Ongoing</td>
+  </tr>
 </table>
+
+
+
+
   
+
 

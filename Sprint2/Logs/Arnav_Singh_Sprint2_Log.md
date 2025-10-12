@@ -1,4 +1,4 @@
-# Arnav Singh – Sprint 2 Contribution Log (Final, corrected)
+# Arnav Singh – Sprint 2 Contribution Log
 
 | Date       | Task(s)                                                                 | Time Spent | Notes |
 |------------|--------------------------------------------------------------------------|------------|-------|
@@ -22,3 +22,4 @@
 - Full organizer event lifecycle (create → edit pending → delete pending) with admin sync.
 - Saved events logic complete (local/session storage); UI wiring pending.
 - Supabase schema/RLS fixes and React Query v5 cleanup.
+

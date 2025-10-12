@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Search, Calendar } from 'lucide-react';
 
 import Navigation from '@/components/layout/Navigation';
@@ -46,11 +46,13 @@ const SearchEvents: React.FC = () => {
     const { data: categoryOptions = [] } = useQuery({
         queryKey: ['event-categories'],
         queryFn: async (): Promise<string[]> => listEventCategories(),
+        placeholderData: keepPreviousData,
     });
 
     const { data: orgOptionsRaw = [] } = useQuery({
         queryKey: ['orgs-basic'],
         queryFn: async () => listOrganizationsBasic(),
+        placeholderData: keepPreviousData,
     });
     const orgOptions: Opt[] = useMemo(
         () => orgOptionsRaw.map(o => ({ label: o.name, value: o.org_id })),
@@ -58,7 +60,12 @@ const SearchEvents: React.FC = () => {
     );
 
     // Data: fetch all matching (server sorts/filters), paginate client side
-    const { data: allEvents = [], isLoading, error, refetch } = useQuery({
+    const {
+        data: allEvents = [],
+        isLoading,
+        error,
+        refetch,
+    } = useQuery({
         queryKey: ['events', { q, categories, orgIds, dateFrom, dateTo, sort }],
         queryFn: () =>
             listEvents({
@@ -69,14 +76,24 @@ const SearchEvents: React.FC = () => {
                 dateTo,
                 sort,
             }),
-        keepPreviousData: true,
+        // v5: keep previous data during refetches
+        placeholderData: keepPreviousData,
     });
 
-    const totalEvents = allEvents.length;
+    // Only show events visible to students (published or explicitly approved flag)
+    const visibleEvents: Event[] = useMemo(
+        () =>
+            (allEvents as any[]).filter(
+                (e) => e?.status === 'published' || e?.isApproved === true // backwards-compat
+            ),
+        [allEvents]
+    );
+
+    const totalEvents = visibleEvents.length;
     const pagedEvents = useMemo(() => {
         const start = (page - 1) * PER_PAGE;
-        return allEvents.slice(start, start + PER_PAGE);
-    }, [allEvents, page]);
+        return visibleEvents.slice(start, start + PER_PAGE);
+    }, [visibleEvents, page]);
 
     // Reset to page 1 when filters change
     useEffect(() => {
@@ -341,7 +358,7 @@ const SearchEvents: React.FC = () => {
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                             {pagedEvents.map((event: Event) => (
                                 <EventCard
-                                    key={event.id}
+                                    key={(event as any).id ?? (event as any).event_id}
                                     event={event}
                                     onRSVP={handleRSVP}
                                     showActions={true}

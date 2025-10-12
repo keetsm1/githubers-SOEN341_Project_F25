@@ -245,9 +245,9 @@ const Index = () => {
                   <div
                     key={ev.id}
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-                    onClick={() => navigate('/search')}
+                    onClick={() => navigate(`/events/${ev.id}`)}
                     role="button"
-                    aria-label={`View ${ev.title} in events`}
+                    aria-label={`View ${ev.title} details`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 bg-primary rounded-full" />

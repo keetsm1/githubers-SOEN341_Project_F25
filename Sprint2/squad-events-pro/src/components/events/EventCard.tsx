@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -87,22 +88,22 @@ const EventCard: React.FC<EventCardProps> = ({
                 setIsStarred(true);
             }
         } finally {
-            setIsStarring(false);
         }
     };
 
     return (
         <Card className="group hover:shadow-elevated transition-all duration-200 overflow-hidden">
             {event.imageUrl && (
-                <div className="aspect-video overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        src={event.imageUrl}
-                        alt={event.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        loading="lazy"
-                    />
-                </div>
+                <Link to={`/events/${eventId}`} className="block">
+                    <div className="aspect-video overflow-hidden">
+                        <img
+                            src={event.imageUrl}
+                            alt={event.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            loading="lazy"
+                        />
+                    </div>
+                </Link>
             )}
 
             <CardHeader className="pb-3">
@@ -123,7 +124,9 @@ const EventCard: React.FC<EventCardProps> = ({
                                 </Badge>
                             )}
                         </div>
-                        <h3 className="font-semibold text-lg leading-tight mb-2">{event.title}</h3>
+                        <Link to={`/events/${eventId}`} className="hover:underline">
+                            <h3 className="font-semibold text-lg leading-tight mb-2">{event.title}</h3>
+                        </Link>
                         {event.description && (
                             <p className="text-muted-foreground text-sm line-clamp-2">{event.description}</p>
                         )}

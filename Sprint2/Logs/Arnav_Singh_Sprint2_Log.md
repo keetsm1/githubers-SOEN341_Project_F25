@@ -6,5 +6,6 @@
 | 2025-10-08 | Task.6.6                                     | 5 hrs | Added edit flow for `/events/:id/edit`, `EditEvent` page, guarded actions in `EventCard`, and My Events wiring. |
 | 2025-10-08 | Task.6.7                                     | 3 hrs | Added Delete (pending-only) in `EventCard` and My Events. Pending-only delete in service layer. |
 | 2025-10-10 | Task.5.4      | 4 hrs | Added multi-select Categories/Organizations, date range, sort, and search with AND logic. Active filter chips + “Clear all”. |
-| 2025-10-11 | Task.7.2         | 3 hrs | Designed approach and wrote code to persist/retrieve saved event IDs using local/session storage .|
+
+
 

@@ -38,12 +38,22 @@ The primary goals for Sprint 3 were to:
 ## 🗂 Sprint Issue Table (Progress Tracker)
 
 | Title | Assignees | Labels | Story Points | Start Date | End Date | Status | Issue Link |
-|--------|------------|---------|---------------|-------------|-----------|----------|-------------|
-| [USER STORY] Event Features: Listing, Creation & Management | Ranjit, Wijdane, Arnav, Gunkeet | Frontend, Backend, Feature Enhancement | 37 | Sept 26, 2025 | Oct 12, 2025 | ✅ Completed | [#43](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/43) |
-| [USER STORY] Database & Supabase Configuration | Gunkeet | Database | 20 | Sept 26, 2025 | Oct 12, 2025 | ✅ Completed | [#90](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/90) |
-| [USER STORY] Documentation & Wiki Updates | Wijdane | Documentation | 6 | Sept 26, 2025 | Oct 12, 2025 | ✅ Completed | [#68](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/68) |
-| [USER STORY] Coordination & Project Management | Ranjit, Kevin | Scrum Master, Project Management | 8 | Sept 26, 2025 | Oct 12, 2025 | ✅ Completed | [#79](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/79) |
-| [USER STORY & ISSUES] Debugging & Interface Fixes | Lorne, Saad | Frontend, Debugging, Testing | 8 | Sept 26, 2025 | Oct 12, 2025 | ✅ Completed | [#77](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/77) |
+|-------|------------|--------|---------------|-------------|-----------|----------|-------------|
+| [USER STORY] US.9 – Add Friends Feature | Arnav | Student, Frontend, Backend | 11 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#63](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/63) |
+| [USER STORY] US.10 – RSVP to Events | Widjane | Student, Frontend, Backend | 15 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#97](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/97) |
+| [USER STORY] US.11 – Generate Ticket with QR Code | Aariz | Student, Frontend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#101](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/101) |
+| [USER STORY] US.12 – Documentation | Saad | Documentation | 9 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#145](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/145) |
+| [USER STORY] US.13 – Cancel RSVP | Widjane | Student, Frontend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#107](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/107) |
+| [USER STORY] US.15 – Real-Time Attendance Dashboard | Hotplate5 | Organizer, Frontend, Backend | 9 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#114](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/114) |
+| [USER STORY] US.16 – View Registration Trends | Kevin | Organizer, Analytics | 6 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#118](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/118) |
+| [USER STORY] US.17 – Track Attendance Rate | Hotplate5 | Organizer, Backend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#121](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/121) |
+| [USER STORY] US.18 – Admin-Level System Analytics | Aariz | Admin, Backend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#124](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/124) |
+| [USER STORY] US.19 – Event Popularity Metrics | Kevin | Organizer, Frontend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#127](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/127) |
+| [USER STORY] US.21 – Database Management for Sprint 3 | Arnav | Backend | 8 | Oct 13, 2025 | Nov 1, 2025 | ⏳ In Progress | [#155](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/155) |
+
+> **Status Legend:**  
+> ✅ Completed | ⏳ In Progress | 🔲 Not Started | ⚠ Blocked
+
 
 > **Status Legend:**  
 > ✅ Completed | ⏳ In Progress | 🔲 Not Started | ⚠ Blocked
@@ -105,6 +115,7 @@ The team delivered student RSVP and ticket systems, organizer analytics dashboar
 Through continued collaboration and well-defined roles, the team sustained momentum and prepared for final integration and user testing in Sprint 4.
 
 ---
+
 
 
 

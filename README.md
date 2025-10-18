@@ -40,11 +40,38 @@ This project is a Campus Events & Ticketing Web Application designed to help stu
    - View global stats
    - Manage Organizations
 
-:pushpin:**Tech Stack**
+:pushpin: **Tech Stack**
 ---
-  - Frontend: Javascript, React.js, HTML,CSS
-  - Backend: Node.js with Express.js
-  - Database: PostgreSQL (Cloud-hosted on Supabase)
+
+### Frontend
+- **Framework:** React 18.3.1 + TypeScript 5.8.3  
+- **Build Tool:** Vite 5.4.19  
+- **UI Framework:** shadcn/ui with Radix UI components  
+- **Styling:** Tailwind CSS 3.4.17  
+- **Forms:** React Hook Form 7.61.1 + Zod validation  
+- **Charts:** Recharts 2.15.4  
+- **Routing:** React Router DOM 6.30.1  
+- **State Management:** React Context + TanStack Query  
+
+### Backend
+- **Platform:** Supabase (PostgreSQL + Auth)  
+
+### Key Directories
+- `src/pages/` – 15 pages (11 main + 4 admin)  
+- `src/components/` – 50+ reusable UI components  
+- `src/services/` – Database service layer  
+- `src/contexts/` – AuthContext for authentication  
+- `src/hooks/` – Custom React hooks  
+
+### Database Tables
+1. **profiles** – User profiles with roles  
+2. **companies** – Company/organization records  
+3. **events** – Event listings  
+4. **friendships** – Friend relationships  
+5. **friend_requests** – Pending friend requests  
+6. **starred_events** – User-starred events  
+7. **organizations** – Approved organizations
+
 ---
 ![Logo](https://upload.wikimedia.org/wikipedia/fr/9/97/Universit%C3%A9_Concordia_%28logo%29.svg)
 

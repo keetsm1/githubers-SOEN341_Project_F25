@@ -100,12 +100,12 @@ The primary goals for Sprint 3 were to:
 ---
 
 ## 🏁 Sprint Summary
-Sprint 2 transformed the project from **initial setup to a working prototype**.  
-Through strong collaboration, the team integrated Supabase, refined the frontend, and implemented complete event management features.  
-The sprint demonstrated how effective coordination and consistent communication accelerate progress.  
-By the end of Sprint 2, the GitHubers team successfully delivered a **functional, stable, and visually refined prototype**, ready for further feature expansion in Sprint 3.
+Sprint 3 expanded GitHubers into a comprehensive event management platform.
+The team delivered student RSVP and ticket systems, organizer analytics dashboards, and admin performance tools while maintaining robust documentation and database consistency.
+Through continued collaboration and well-defined roles, the team sustained momentum and prepared for final integration and user testing in Sprint 4.
 
 ---
+
 
 
 

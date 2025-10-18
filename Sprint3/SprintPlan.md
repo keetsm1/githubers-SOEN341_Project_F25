@@ -13,24 +13,25 @@ This document tracks the **progress and performance of Sprint 3**, from October 
 
 ## 🎯 Sprint Objectives
 The primary goals for Sprint 3 were to:
-1. Complete all core functionalities for students, organizers, and administrators.
-2. Implement the Save to Calendar, QR Ticket, and Event Approval Dashboard modules.
-3. Deliver a working system architecture diagram showing integration between frontend, backend, and database.
-4. Maintain and expand **documentation and wiki** for clarity and project tracking.  
-5. Perform **debugging and interface fixes** to improve overall stability.  
+1. Implement **RSVP and Ticker Functionalities** for students.
+2. Introduce **QR code ticket generation and display**.
+3. Develop **friend management and event** sharing features.
+4. Provide **organizer dashboards** for attendance and registration analytics.  
+5. Establish **admin-level system metrics and Superbase management**.
+6. Expand and standarize **project documentation and developer guides**.
 
 ---
 
 ## 👥 Team Members & Roles
 | Name    | Role |
 |---------|------|
-| Ranjit  | Scrum Master, Fullstack Lead |
-| Gunkeet | Database Engineer, Backend Support |
-| Wijdane | Documentation & Frontend Enhancement |
-| Arnav   | Backend Developer |
-| Kevin   | Project Coordinator |
+| Ranjit  | Scrum Master, Issue Manager |
+| Gunkeet | DFrontend,Admin developer and Backend support |
+| Wijdane | Frontend |
+| Arnav   | Backend Developer/Database |
+| Kevin   | Frontend |
 | Saad    | Documentation |
-| Lorne   | Debugging & UI Tester |
+| Lorne   | Backend |
 
 ---
 
@@ -104,5 +105,6 @@ The sprint demonstrated how effective coordination and consistent communication 
 By the end of Sprint 2, the GitHubers team successfully delivered a **functional, stable, and visually refined prototype**, ready for further feature expansion in Sprint 3.
 
 ---
+
 
 

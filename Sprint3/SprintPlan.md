@@ -26,7 +26,7 @@ The primary goals for Sprint 3 were to:
 | Name    | Role |
 |---------|------|
 | Ranjit  | Scrum Master, Issue Manager |
-| Gunkeet | DFrontend,Admin developer and Backend support |
+| Gunkeet | Frontend, Admin developer and Backend support |
 | Wijdane | Frontend |
 | Arnav   | Backend Developer/Database |
 | Kevin   | Frontend |
@@ -68,7 +68,7 @@ The primary goals for Sprint 3 were to:
 
 ## 📝 Key Highlights
 - **Friend Requests and Following** implemeted with UI flows and persistence.  
-- **Save-to-Calender** added on event card with state retained on reload.  
+- Succesful implementation of **RSVP ticketing, and QR code generation**.  
 - **Frontend enhancements**: filtering, event starring, and responsive design.  
 - **Backend logic** implemented for CRUD event operations.  
 - Documentation, sprint notes, and wiki consistently maintained.  
@@ -88,10 +88,11 @@ The primary goals for Sprint 3 were to:
 
 ---
 
-## ✅ Sprint 2 Deliverables Checklist
-- [x] Event features (create, list, manage) fully functional  
-- [x] Supabase configuration completed and connected  
-- [x] Database authentication integrated  
+## ✅ Sprint 3 Deliverables Checklist
+- [x] RSVP and ticket functionalities integrated succesfully  
+- [x] QR code ticket display page 
+- [x] Friend system (adding friends and shared events) functional
+- [x] Organizer and admin dashboards completed
 - [x] Wiki and documentation updated  
 - [x] Debugging and UI fixes completed  
 - [x] Stable prototype delivered  
@@ -105,6 +106,7 @@ The sprint demonstrated how effective coordination and consistent communication 
 By the end of Sprint 2, the GitHubers team successfully delivered a **functional, stable, and visually refined prototype**, ready for further feature expansion in Sprint 3.
 
 ---
+
 
 
 

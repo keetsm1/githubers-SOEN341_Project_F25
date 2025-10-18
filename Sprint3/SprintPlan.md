@@ -66,8 +66,8 @@ The primary goals for Sprint 3 were to:
 ---
 
 ## 📝 Key Highlights
-- Functional **event creation, listing, and management system** completed.  
-- **Supabase database** successfully integrated with authentication and data sync.  
+- **Friend Requests and Following** implemeted with UI flows and persistence.  
+- **Save-to-Calender** added on event card with state retained on reload.  
 - **Frontend enhancements**: filtering, event starring, and responsive design.  
 - **Backend logic** implemented for CRUD event operations.  
 - Documentation, sprint notes, and wiki consistently maintained.  
@@ -104,4 +104,5 @@ The sprint demonstrated how effective coordination and consistent communication 
 By the end of Sprint 2, the GitHubers team successfully delivered a **functional, stable, and visually refined prototype**, ready for further feature expansion in Sprint 3.
 
 ---
+
 

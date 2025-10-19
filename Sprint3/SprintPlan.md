@@ -44,7 +44,7 @@ The primary goals for Sprint 3 were to:
 | [USER STORY] US.11 – Generate Ticket with QR Code | Gunkeet | Student, Frontend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#101](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/101) |
 | [USER STORY] US.12 – Documentation | Saad | Documentation | 9 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#145](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/145) |
 | [USER STORY] US.13 – Cancel RSVP | Widjane | Student, Frontend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#107](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/107) |
-| [USER STORY] US.15 – Real-Time Attendance Dashboard | Hotplate5 | Organizer, Frontend, Backend | 9 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#114](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/114) |
+| [USER STORY] US.15 – Real-Time Attendance Dashboard | Lorne | Organizer, Frontend, Backend | 9 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#114](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/114) |
 | [USER STORY] US.16 – View Registration Trends | Kevin | Organizer, Analytics | 6 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#118](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/118) |
 | [USER STORY] US.17 – Track Attendance Rate | Lorne | Organizer, Backend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#121](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/121) |
 | [USER STORY] US.18 – Admin-Level System Analytics | Gunkeet | Admin, Backend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#124](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/124) |
@@ -115,6 +115,7 @@ The team delivered student RSVP and ticket systems, organizer analytics dashboar
 Through continued collaboration and well-defined roles, the team sustained momentum and prepared for final integration and user testing in Sprint 4.
 
 ---
+
 
 
 

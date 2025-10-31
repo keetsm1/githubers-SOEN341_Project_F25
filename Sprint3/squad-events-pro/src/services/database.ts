@@ -1,29 +1,69 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase, isSupabaseEnabled } from '@/lib/supabase';
+// Re-export for modules that import supabase from this file
+export { supabase, isSupabaseEnabled };
 
 /** ──────────────────────────────────────────────────────────────────────────
- *  Supabase client boot (Vite / Node-ish)
+ *  Supabase client (shared singleton from lib/supabase)
  *  ────────────────────────────────────────────────────────────────────────── */
-const viteEnv = (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
-const nodeEnv =
-    typeof process !== 'undefined' && (process as any).env ? (process as any).env : {};
 
-const supaBaseUrl: string =
-    viteEnv.VITE_SUPABASE_URL ||
-    nodeEnv.NEXT_PUBLIC_SUPABASE_URL ||
-    '';
+// Small helper to generate a random id when needed (fallback path)
+function cryptoRandomId() {
+    try {
+        // @ts-ignore
+        const arr = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto.getRandomValues(new Uint32Array(4)) : null;
+        if (arr) return Array.from(arr).map(n => n.toString(16)).join('');
+    } catch {}
+    return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
 
-const supabaseAnonKey: string =
-    viteEnv.VITE_SUPABASE_ANON_KEY ||
-    nodeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    '';
-
-export const isSupabaseEnabled = !!(supaBaseUrl && supabaseAnonKey);
-
-export const supabase = isSupabaseEnabled
-    ? createClient(supaBaseUrl as string, supabaseAnonKey as string, {
-        auth: { persistSession: true, autoRefreshToken: true },
-    })
-    : null;
+// Recently-joined cache to smooth UI immediately after RSVP across remounts
+const RECENT_JOIN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+function getLocalUid(): string | undefined {
+    try {
+        const raw = localStorage.getItem('campusUser');
+        return raw ? (JSON.parse(raw)?.id as string | undefined) : undefined;
+    } catch {
+        return undefined;
+    }
+}
+function setRecentlyJoined(uid: string, eventId: string) {
+    try {
+        const key = 'recentlyJoined';
+        const raw = localStorage.getItem(key);
+        const obj = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+        obj[`${uid}:${eventId}`] = Date.now();
+        localStorage.setItem(key, JSON.stringify(obj));
+    } catch {}
+}
+function wasRecentlyJoined(uid: string, eventId: string): boolean {
+    try {
+        const key = 'recentlyJoined';
+        const raw = localStorage.getItem(key);
+        if (!raw) return false;
+        const obj = JSON.parse(raw) as Record<string, number>;
+        const ts = obj[`${uid}:${eventId}`];
+        if (!ts) return false;
+        if (Date.now() - ts > RECENT_JOIN_TTL_MS) {
+            // Expired; clean entry
+            delete obj[`${uid}:${eventId}`];
+            localStorage.setItem(key, JSON.stringify(obj));
+            return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+function clearRecentlyJoined(uid: string, eventId: string) {
+    try {
+        const key = 'recentlyJoined';
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const obj = JSON.parse(raw) as Record<string, number>;
+        delete obj[`${uid}:${eventId}`];
+        localStorage.setItem(key, JSON.stringify(obj));
+    } catch {}
+}
 
 /** ──────────────────────────────────────────────────────────────────────────
  *  Auth helpers (kept behavior; added ensureProfile)
@@ -118,13 +158,13 @@ export interface Event {
 }
 
 export interface Ticket {
-    id: string;
-    eventId: string;
-    userId: string;
-    qrCode: string;
-    isCheckedIn: boolean;
-    checkedInAt?: string;
-    createdAt: string;
+    id: string;            // ticket_id
+    eventId: string;       // event_id
+    userId: string;        // user_id
+    qrCode: string;        // qr_code
+    isCheckedIn: boolean;  // future use; not persisted yet
+    checkedInAt?: string;  // future use; not persisted yet
+    createdAt: string;     // created_at
 }
 
 export interface Friendship {
@@ -258,11 +298,9 @@ export async function listEvents(filters: EventFilters = {}): Promise<Event[]> {
 
     let query = supabase
         .from('events')
-        .select(
-            `event_id, org_id, title, description, starts_at, ends_at, location,
-       max_cap, image_url, status, created_at, created_by, category`
-        )
-        .eq('status', 'published');
+        .select('*')
+        // Do not filter by status here to support both text and boolean schemas.
+        // We'll map and filter client-side using isApproved.
 
     if (categories?.length) query = query.in('category', categories);
     if (orgIds?.length)     query = query.in('org_id', orgIds);
@@ -292,7 +330,7 @@ export async function listEvents(filters: EventFilters = {}): Promise<Event[]> {
 
     // Map DB → UI Event
     return (data ?? []).map((ev: any) => ({
-        id: ev.event_id,
+        id: ev.event_id ?? ev.id,
         title: ev.title,
         description: ev.description ?? '',
         date: ev.starts_at,
@@ -304,7 +342,10 @@ export async function listEvents(filters: EventFilters = {}): Promise<Event[]> {
         currentAttendees: 0, // wire to registrations count later
         imageUrl: ev.image_url ?? undefined,
         tags: [],
-        isApproved: ev.status === 'published',
+        // Support both boolean true and text statuses ('published' | 'approved')
+        isApproved:
+            (ev.status === true) ||
+            (typeof ev.status === 'string' && ['published', 'approved'].includes(ev.status.toLowerCase())),
         createdAt: ev.created_at,
     })) as Event[];
 }
@@ -322,13 +363,23 @@ export async function createEvent(input: EventInsert) {
 
 // Get a single event by id
 export async function getEventById(eventId: string) {
-    const { data, error } = await supabase
+    // Try by event_id first, then fallback to id
+    let { data, error } = await supabase
         .from('events')
         .select('*')
         .eq('event_id', eventId)
-        .single();
-
+        .maybeSingle();
     if (error) throw error;
+    if (!data) {
+        const res2 = await supabase
+            .from('events')
+            .select('*')
+            .eq('id', eventId)
+            .maybeSingle();
+        if (res2.error) throw res2.error;
+        data = res2.data as any;
+    }
+    if (!data) throw new Error('Event not found');
     return data as EventRow;
 }
 
@@ -500,11 +551,11 @@ export const db = {
         if (!supabase) throw new Error('Supabase not configured');
         const { data, error } = await supabase
             .from('starred_events')
-            .select('event:events (event_id, title, description, starts_at, location, category, organizer_id, max_cap, image_url, tags, status, created_at, created_by)')
+            .select('event:events (*)')
             .eq('user_id', uid);
         if (error) throw error;
         return (data ?? []).map((row: any) => ({
-            id: row.event.event_id,
+            id: row.event.event_id ?? row.event.id,
             title: row.event.title,
             description: row.event.description ?? '',
             date: row.event.starts_at,
@@ -516,7 +567,9 @@ export const db = {
             currentAttendees: 0,
             imageUrl: row.event.image_url ?? undefined,
             tags: row.event.tags ?? [],
-            isApproved: row.event.status === 'published',
+            isApproved:
+                (row.event.status === true) ||
+                (typeof row.event.status === 'string' && ['published', 'approved'].includes(row.event.status.toLowerCase())),
             createdAt: row.event.created_at,
         }));
     },
@@ -597,10 +650,7 @@ export const db = {
         const { data, error } = await supabase
             .from('events')
             .insert(payload)
-            .select(`
-        event_id, title, description, starts_at, ends_at, location,
-        max_cap, image_url, status, created_at, created_by, org_id, category, org_name
-      `)
+            .select('*')
             .single();
 
         if (error) {
@@ -612,7 +662,7 @@ export const db = {
 
         // Map DB -> UI
         return {
-            id: data.event_id,
+            id: (data as any).event_id ?? (data as any).id,
             title: data.title,
             description: data.description ?? '',
             date: data.starts_at,
@@ -624,8 +674,8 @@ export const db = {
             currentAttendees: 0,
             imageUrl: data.image_url ?? undefined,
             tags: eventData.tags ?? [],
-            isApproved: Boolean(data.status),
-            statusText: (Boolean(data.status) ? 'approved' : 'pending') as 'approved' | 'pending' | 'rejected',
+            isApproved: Boolean(((data as any).status === true) || (['published','approved'].includes(String((data as any).status).toLowerCase()))),
+            statusText: (((data as any).status === true) || (['published','approved'].includes(String((data as any).status).toLowerCase()))) ? 'approved' : 'pending',
             createdAt: data.created_at,
         };
     },
@@ -642,13 +692,7 @@ export const db = {
         if (!supabase) throw new Error('Supabase not configured');
         await requireAuth();
 
-        let query = supabase.from('events').select(
-            `
-        event_id, title, description, starts_at, ends_at, location,
-        max_cap, image_url, status, created_at, created_by, org_id, category, org_name
-      `,
-            { count: 'exact' }
-        );
+        let query = supabase.from('events').select('*', { count: 'exact' });
 
         if (filters?.organizerId) {
             query = query.eq('created_by', filters.organizerId);
@@ -705,7 +749,7 @@ export const db = {
             }
 
             return {
-                id: ev.event_id,
+                id: (ev as any).event_id ?? (ev as any).id,
                 title: ev.title,
                 description: ev.description ?? '',
                 date: ev.starts_at,
@@ -745,33 +789,383 @@ export const db = {
         if (eventIndex >= 0) mockEvents.splice(eventIndex, 1);
     },
 
-    /* ───────────── Tickets (mocked) ───────────── */
+    /* ───────────── Tickets (local storage backed for Sprint 2) ───────────── */
 
-    async createTicket(eventId: string, userId: string): Promise<Ticket> {
-        return {
+    async hasUserTicket(eventId: string, userId?: string): Promise<boolean> {
+        if (isSupabaseEnabled && supabase) {
+            // Always use the current session user to satisfy RLS
+            const uid = userId || await requireAuth();
+            // Fast-path: honor recent local join to avoid flicker after remount
+            if (wasRecentlyJoined(uid, eventId)) return true;
+            // Prefer tickets table if available
+            try {
+                const { count, error } = await supabase
+                    .from('tickets')
+                    .select('ticket_id', { head: true, count: 'exact' })
+                    .eq('event_id', eventId)
+                    .eq('user_id', uid);
+                if (!error) return (count ?? 0) > 0;
+            } catch {}
+            // Fallback to registrations
+            const { count: rcount, error: rerr } = await supabase
+                .from('registrations')
+                .select('registration_id', { head: true, count: 'exact' })
+                .eq('event_id', eventId)
+                .eq('user_id', uid);
+            if (rerr) throw rerr;
+            return (rcount ?? 0) > 0;
+        }
+        // Local storage fallback
+        const { readJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        if (!userId) return false;
+        // Also honor recent local join cache
+        return all.some(t => t.eventId === eventId && t.userId === userId) ||
+            (getLocalUid() ? wasRecentlyJoined(getLocalUid() as string, eventId) : false);
+    },
+
+    async createTicket(eventId: string, _userId?: string): Promise<Ticket> {
+        // Client-side guard: block RSVPs to past events early with a clear error
+        try {
+            const ev = await getEventById(eventId);
+            const starts = new Date((ev as any)?.starts_at ?? (ev as any)?.date ?? 0);
+            if (starts <= new Date()) {
+                throw new Error('This event has already ended. RSVP is closed.');
+            }
+        } catch {
+            // If lookup fails, continue; server will enforce rules
+        }
+        if (isSupabaseEnabled && supabase) {
+            // Always use the current session user; ignore any external id to avoid mismatch
+            const uid = await requireAuth();
+            // Prefer atomic RPC if available
+            const { data: rpcData, error: rpcError } = await supabase.rpc('register_for_event', {
+                p_event_id: eventId,
+            });
+            if (!rpcError && rpcData) {
+                // New RPC returns tickets row
+                const t = rpcData as any;
+                setRecentlyJoined(uid, eventId);
+                return {
+                    id: t.ticket_id ?? t.id ?? cryptoRandomId(),
+                    eventId: t.event_id ?? eventId,
+                    userId: t.user_id ?? uid,
+                    qrCode: t.qr_code ?? `QR_${eventId}_${uid}_${Date.now()}`,
+                    isCheckedIn: false,
+                    createdAt: t.created_at ?? new Date().toISOString(),
+                } as Ticket;
+            }
+            // Fallback to safe client-side checks + insert with unique constraint
+            if (rpcError) {
+                const msg = (rpcError as any)?.message || '';
+                if (/already registered/i.test(msg) || (rpcError as any)?.code === '23505') {
+                    throw new Error('You have already RSVPed to this event.');
+                }
+                if (/capacity/i.test(msg)) {
+                    throw new Error('Event is at capacity.');
+                }
+                if (/not published/i.test(msg)) {
+                    throw new Error('Event is not published.');
+                }
+            }
+            // As a last resort, insert registration; rely on unique constraint to block dupes
+            const { data: reg, error: regErr } = await supabase
+                .from('registrations')
+                .insert({ event_id: eventId, user_id: uid })
+                .select('registration_id, event_id, user_id, created_at')
+                .single();
+            if (regErr) {
+                const code = (regErr as any)?.code;
+                if (code === '23505') {
+                    throw new Error('You have already RSVPed to this event.');
+                }
+                throw regErr;
+            }
+            // Create ticket row tied to the registration
+            let ticketRow: any | null = null;
+            try {
+                const { data: t, error: tErr } = await supabase
+                    .from('tickets')
+                    .insert({
+                        registration_id: (reg as any).registration_id,
+                        event_id: eventId,
+                        user_id: uid,
+                        qr_code: `QR_${eventId}_${uid}_${Date.now()}`,
+                    })
+                    .select('ticket_id, event_id, user_id, qr_code, created_at')
+                    .single();
+                if (tErr) throw tErr;
+                ticketRow = t;
+            } catch {
+                // If tickets table not present, degrade to registration-based ticket
+                ticketRow = null;
+            }
+            setRecentlyJoined(uid, eventId);
+            if (ticketRow) {
+                return {
+                    id: ticketRow.ticket_id,
+                    eventId: ticketRow.event_id,
+                    userId: ticketRow.user_id,
+                    qrCode: ticketRow.qr_code,
+                    isCheckedIn: false,
+                    createdAt: ticketRow.created_at,
+                } as Ticket;
+            }
+            // Final fallback: synthesize from registration
+            return {
+                id: (reg as any).registration_id,
+                eventId: (reg as any).event_id,
+                userId: (reg as any).user_id,
+                qrCode: `QR_${eventId}_${uid}_${Date.now()}`,
+                isCheckedIn: false,
+                createdAt: (reg as any).created_at,
+            } as Ticket;
+        }
+
+        // Local storage fallback
+        const { readJSON, writeJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        const uidLS = _userId || (() => {
+            try {
+                const raw = localStorage.getItem('campusUser');
+                return raw ? (JSON.parse(raw)?.id as string | undefined) : undefined;
+            } catch { return undefined; }
+        })() || 'local-user';
+        const exists = all.find(t => t.eventId === eventId && t.userId === uidLS);
+        if (exists) {
+            throw new Error('You have already RSVPed to this event.');
+        }
+        try {
+            const ev = await getEventById(eventId);
+            const cap = ev?.max_cap ?? null;
+            if (cap !== null && typeof cap === 'number' && cap > 0) {
+                const currentCount = all.filter(t => t.eventId === eventId).length;
+                if (currentCount >= cap) {
+                    throw new Error('Event is at capacity.');
+                }
+            }
+        } catch {}
+        const ticket: Ticket = {
             id: Date.now().toString(),
             eventId,
-            userId,
-            qrCode: `QR_${eventId}_${userId}_${Date.now()}`,
+            userId: uidLS,
+            qrCode: `QR_${eventId}_${uidLS}_${Date.now()}`,
             isCheckedIn: false,
             createdAt: new Date().toISOString(),
         };
+        writeJSON<Ticket[]>('tickets', [ticket, ...all]);
+        setRecentlyJoined(uidLS, eventId);
+        return ticket;
     },
 
     async getUserTickets(userId: string): Promise<Ticket[]> {
-        return []; // mocked
+        if (isSupabaseEnabled && supabase) {
+            const uid = await requireAuth();
+            if (uid !== userId) throw new Error('Unauthorized');
+            // Prefer tickets table
+            try {
+                const { data: tix, error: terr } = await supabase
+                    .from('tickets')
+                    .select('ticket_id, event_id, user_id, qr_code, created_at')
+                    .eq('user_id', uid)
+                    .order('created_at', { ascending: false });
+                if (terr) throw terr;
+                return (tix ?? []).map((r: any) => ({
+                    id: r.ticket_id,
+                    eventId: r.event_id,
+                    userId: r.user_id,
+                    qrCode: r.qr_code,
+                    isCheckedIn: false,
+                    createdAt: r.created_at,
+                }));
+            } catch {}
+            // Fallback to registrations
+            const { data, error } = await supabase
+                .from('registrations')
+                .select('registration_id, event_id, user_id, created_at')
+                .eq('user_id', uid)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            return (data ?? []).map((r: any) => ({
+                id: r.registration_id, // fallback id
+                eventId: r.event_id,
+                userId: r.user_id,
+                qrCode: `QR_${r.event_id}_${r.user_id}_${new Date(r.created_at).getTime()}`,
+                isCheckedIn: false,
+                createdAt: r.created_at,
+            }));
+        }
+        const { readJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        return all.filter(t => t.userId === userId);
+    },
+
+    async cancelRSVP(eventId: string): Promise<void> {
+        // Cancel the current user's RSVP for an event (deletes ticket and registration)
+        if (isSupabaseEnabled && supabase) {
+            const uid = await requireAuth();
+            // Prefer atomic RPC to handle deletion and counters consistently
+            const { error } = await supabase.rpc('cancel_event_registration', {
+                p_event_id: eventId,
+            });
+            if (error) throw error;
+            // Clear local recent-join cache so UI stops treating it as joined
+            clearRecentlyJoined(uid, eventId);
+            return;
+        }
+        // Local storage fallback
+        const { readJSON, writeJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        const uidLS = getLocalUid();
+        const next = all.filter(t => !(t.eventId === eventId && (!uidLS || t.userId === uidLS)));
+        writeJSON<Ticket[]>('tickets', next);
+        if (uidLS) clearRecentlyJoined(uidLS, eventId);
+    },
+
+    /**
+     * Verify that a cancellation fully removed linked data and counters are synchronized.
+     * Returns an object with counts and ok=true when all conditions pass:
+     *  - tickets remaining for (event,user) == 0
+     *  - registrations remaining for (event,user) == 0
+     *  - event_counters.reg_count matches actual registrations for the event
+     */
+    async verifyCancellationIntegrity(eventId: string): Promise<{
+        ticketsRemaining: number;
+        registrationsRemaining: number;
+        regCountInCounters: number;
+        regCountActual: number;
+        ok: boolean;
+    }> {
+        if (!isSupabaseEnabled || !supabase) {
+            // Local mode: best-effort check
+            const { readJSON } = await import('@/lib/storage');
+            const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+            const uid = getLocalUid() || '';
+            const ticketsRemaining = all.filter(t => t.eventId === eventId && t.userId === uid).length;
+            // No registrations table locally
+            const registrationsRemaining = ticketsRemaining; // approximate
+            return {
+                ticketsRemaining,
+                registrationsRemaining,
+                regCountInCounters: 0,
+                regCountActual: all.filter(t => t.eventId === eventId).length,
+                ok: ticketsRemaining === 0 && registrationsRemaining === 0,
+            };
+        }
+        const uid = await requireAuth();
+        // Prefer RPC if available
+        try {
+            const { data, error } = await supabase.rpc('verify_cancellation_integrity', {
+                p_event_id: eventId,
+                p_user_id: uid,
+            });
+            if (!error && Array.isArray(data) && data.length > 0) {
+                const row: any = data[0];
+                return {
+                    ticketsRemaining: Number(row.tickets_remaining ?? 0),
+                    registrationsRemaining: Number(row.registrations_remaining ?? 0),
+                    regCountInCounters: Number(row.reg_count_in_counters ?? 0),
+                    regCountActual: Number(row.reg_count_actual ?? 0),
+                    ok: Boolean(row.ok),
+                };
+            }
+        } catch { /* fall through to client-side check */ }
+
+        // Fallback: do three direct queries
+        const [{ count: tCount }, { count: rUserCount }, { data: cRow }, { count: rTotalCount }] = await Promise.all([
+            supabase
+                .from('tickets')
+                .select('ticket_id', { head: true, count: 'exact' })
+                .eq('event_id', eventId)
+                .eq('user_id', uid),
+            supabase
+                .from('registrations')
+                .select('registration_id', { head: true, count: 'exact' })
+                .eq('event_id', eventId)
+                .eq('user_id', uid),
+            supabase
+                .from('event_counters')
+                .select('reg_count')
+                .eq('event_id', eventId)
+                .maybeSingle(),
+            supabase
+                .from('registrations')
+                .select('registration_id', { head: true, count: 'exact' })
+                .eq('event_id', eventId),
+        ] as const);
+
+        const ticketsRemaining = Number(tCount ?? 0);
+        const registrationsRemaining = Number(rUserCount ?? 0);
+        const regCountInCounters = Number((cRow as any)?.reg_count ?? 0);
+        const regCountActual = Number(rTotalCount ?? 0);
+        const ok = ticketsRemaining === 0 && registrationsRemaining === 0 && regCountInCounters === regCountActual;
+        return { ticketsRemaining, registrationsRemaining, regCountInCounters, regCountActual, ok };
+    },
+
+    /**
+     * Attempt to resynchronize event counters for a single event (no-op if RPC is missing).
+     */
+    async syncEventCounters(eventId: string): Promise<void> {
+        if (!isSupabaseEnabled || !supabase) return;
+        try {
+            await supabase.rpc('sync_single_event_counters', { p_event_id: eventId });
+        } catch {
+            // ignore if RPC not present
+        }
     },
 
     async checkInTicket(ticketId: string): Promise<Ticket> {
-        return {
-            id: ticketId,
-            eventId: '1',
-            userId: '1',
-            qrCode: `QR_${ticketId}`,
+        const { readJSON, writeJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        const idx = all.findIndex(t => t.id === ticketId);
+        if (idx === -1) throw new Error('Ticket not found');
+        const updated: Ticket = {
+            ...all[idx],
             isCheckedIn: true,
             checkedInAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
         };
+        all[idx] = updated;
+        writeJSON<Ticket[]>('tickets', all);
+        return updated;
+    },
+
+    async getEventTicketCount(eventId: string): Promise<number> {
+        if (isSupabaseEnabled && supabase) {
+            // Prefer the aggregate counter if available
+            try {
+                const { data: ec } = await supabase
+                    .from('event_counters')
+                    .select('reg_count')
+                    .eq('event_id', eventId)
+                    .maybeSingle();
+                if (ec && typeof (ec as any).reg_count === 'number') {
+                    return (ec as any).reg_count as number;
+                }
+            } catch {
+                // ignore and fall back
+            }
+            const { count, error } = await supabase
+                    .from('registrations')
+                    .select('registration_id', { count: 'exact', head: true })
+                    .eq('event_id', eventId);
+            if (error) throw error;
+            return count ?? 0;
+        }
+        const { readJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        return all.filter(t => t.eventId === eventId).length;
+    },
+
+    async isEventFull(eventId: string): Promise<boolean> {
+        try {
+            const ev = await getEventById(eventId);
+            const cap = ev?.max_cap ?? null;
+            if (!cap || cap <= 0) return false;
+            const count = await db.getEventTicketCount(eventId);
+            return count >= cap;
+        } catch {
+            return false;
+        }
     },
 
     /* ───────────── Friends (Supabase-backed) ───────────── */
@@ -876,7 +1270,7 @@ export const db = {
             currentAttendees: 0,
             imageUrl: ev.image_url ?? undefined,
             tags: [],
-            isApproved: ev.status === 'published',
+            isApproved: (ev.status === true) || (typeof ev.status === 'string' && ['published','approved'].includes(ev.status.toLowerCase())),
             createdAt: ev.created_at,
         }));
     },
@@ -965,3 +1359,75 @@ export const db = {
         };
     },
 };
+
+/**
+ * Subscribe to realtime registration count changes for a specific event.
+ * - Immediately fetches current count and invokes onCount(count)
+ * - Listens for INSERT and DELETE on public.registrations filtered by event_id
+ * - Returns an unsubscribe function to clean up the channel
+ */
+export function subscribeToEventRegistrationCount(
+    eventId: string,
+    onCount: (count: number) => void
+): () => void {
+    if (!isSupabaseEnabled || !supabase) {
+        // No-op in local/mock mode
+        return () => {};
+    }
+
+    // Seed with the current count, preferring event_counters if available
+    (async () => {
+        try {
+            const { data: ec } = await supabase
+                .from('event_counters')
+                .select('reg_count')
+                .eq('event_id', eventId)
+                .maybeSingle();
+            if (ec && typeof (ec as any).reg_count === 'number') {
+                onCount((ec as any).reg_count as number);
+                return;
+            }
+        } catch {
+            // ignore and fallback
+        }
+        try {
+            const fallback = await db.getEventTicketCount(eventId);
+            onCount(fallback);
+        } catch {
+            // ignore
+        }
+    })();
+
+    // Subscribe to counters table for global live updates
+    const channel = supabase
+        .channel(`reg_count_${eventId}`)
+        .on(
+            'postgres_changes',
+            {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'event_counters',
+                filter: `event_id=eq.${eventId}`,
+            },
+            (payload: any) => {
+                const next = (payload?.new?.reg_count ?? payload?.new?.reg_count === 0)
+                    ? Number(payload.new.reg_count)
+                    : undefined;
+                if (typeof next === 'number' && !Number.isNaN(next)) {
+                    onCount(next);
+                }
+            }
+        )
+        .subscribe((status) => {
+            // eslint-disable-next-line no-console
+            if (status === 'CHANNEL_ERROR') console.warn('Realtime channel error for', eventId);
+        });
+
+    return () => {
+        try {
+            supabase.removeChannel(channel);
+        } catch {
+            // ignore
+        }
+    };
+}

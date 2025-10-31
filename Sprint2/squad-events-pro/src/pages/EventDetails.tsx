@@ -7,6 +7,18 @@ import Navigation from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from '@/components/auth/LoginForm';
 import { db } from '@/services/database';
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 import { Calendar, MapPin, Users, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -18,6 +30,9 @@ const EventDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [event, setEvent] = useState<any | null>(null);
   const [isRSVPing, setIsRSVPing] = useState(false);
+  const [showRSVPDialog, setShowRSVPDialog] = useState(false);
+  const { toast } = useToast();
+  const [hasTicket, setHasTicket] = useState(false);
 
   const eventId = useMemo(() => id as string, [id]);
 
@@ -57,16 +72,39 @@ const EventDetails: React.FC = () => {
     load();
   }, [eventId]);
 
-  const handleRSVP = async () => {
+  // Check if this user already RSVPed to this event
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      try {
+        if (!user || !eventId) return;
+        const already = await db.hasUserTicket(eventId, user.id);
+        if (mounted) setHasTicket(prev => prev || already);
+      } catch {}
+    };
+    run();
+    return () => { mounted = false; };
+  }, [eventId, user?.id]);
+
+  const handleRSVPConfirm = async () => {
     if (!user || !event) return;
     setIsRSVPing(true);
     try {
-      await db.createTicket(event.id, user.id);
-      navigate('/my-events');
+      await db.createTicket(event.id);
+      toast({
+        title: 'RSVP Successful!',
+        description: 'Your ticket has been generated. Check My Tickets to view it.',
+      });
+      navigate('/my-tickets');
     } catch (e) {
-      alert('Unable to RSVP at this time.');
+      toast({
+        variant: 'destructive',
+        title: 'RSVP Failed',
+        description: 'Unable to RSVP at this time',
+      });
     } finally {
       setIsRSVPing(false);
+      setShowRSVPDialog(false);
     }
   };
 
@@ -137,9 +175,35 @@ const EventDetails: React.FC = () => {
                   </div>
                 </div>
                 {user?.role === 'student' && (
-                  <Button onClick={handleRSVP} disabled={isRSVPing} className="bg-gradient-to-r from-primary to-primary/90">
-                    {isRSVPing ? 'RSVPing…' : 'RSVP'}
-                  </Button>
+                  hasTicket ? (
+                    <Button variant="outline" onClick={() => navigate('/my-tickets')}>
+                      View Ticket
+                    </Button>
+                  ) : event.isApproved ? (
+                    <AlertDialog open={showRSVPDialog} onOpenChange={setShowRSVPDialog}>
+                      <AlertDialogTrigger asChild>
+                        <Button onClick={() => setShowRSVPDialog(true)} disabled={isRSVPing} className="bg-gradient-to-r from-primary to-primary/90">
+                          {isRSVPing ? 'RSVPing…' : 'RSVP'}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirm RSVP</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to RSVP to <b>{event.title}</b>? This will secure your spot if available.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel disabled={isRSVPing}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction asChild>
+                            <Button onClick={handleRSVPConfirm} disabled={isRSVPing}>
+                              {isRSVPing ? 'RSVPing…' : 'Confirm RSVP'}
+                            </Button>
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : null
                 )}
               </div>
             </CardHeader>

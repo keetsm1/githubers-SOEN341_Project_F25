@@ -115,11 +115,11 @@ const SearchEvents: React.FC = () => {
     const handleRSVP = async (eventId: string) => {
         if (!user) return;
         try {
-            const ticket = await db.createTicket(eventId, user.id);
+            const ticket = await db.createTicket(eventId);
             if (ticket) {
                 toast({
                     title: 'RSVP Successful!',
-                    description: 'Your ticket has been generated. Check My Events to view it.',
+                    description: 'Your ticket has been generated. Check My Tickets to view it.',
                 });
             }
             refetch();

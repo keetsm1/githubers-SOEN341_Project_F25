@@ -73,9 +73,8 @@ const CreateEvent = () => {
             const startsAtISO = new Date(formData.date).toISOString();
             const endsAtISO = new Date(new Date(formData.date).getTime() + 60 * 60 * 1000).toISOString(); // +1h default
 
-            // Determine publishability
-            const canPublish = user.role === 'admin' || approvalStatus === 'approved';
-            const status: 'published' | 'pending' = canPublish ? 'published' : 'pending';
+            // All events start as pending and require admin approval
+            const status: 'pending' = 'pending';
 
             // Payload supports both the legacy field names and the DB-ready names.
             const eventData: any = {
@@ -92,7 +91,7 @@ const CreateEvent = () => {
                 max_cap: formData.maxCapacity ? parseInt(formData.maxCapacity, 10) : null,
                 image_url: formData.imageUrl || null,
                 tags: formData.tags,
-                status,
+                status: 'pending',
 
                 // Legacy/client-style (for current service typings/UI that expect these)
                 date: startsAtISO,
@@ -101,7 +100,8 @@ const CreateEvent = () => {
                 maxCapacity: formData.maxCapacity ? parseInt(formData.maxCapacity, 10) : undefined,
                 currentAttendees: 0,
                 imageUrl: formData.imageUrl || undefined,
-                isApproved: canPublish,
+                // Store status string instead of boolean to ensure DB gets 'pending' or 'published'
+                isApproved: status,
             };
 
             await db.createEvent(eventData);
@@ -111,9 +111,7 @@ const CreateEvent = () => {
 
             toast({
                 title: 'Event Created!',
-                description: canPublish
-                    ? 'Your event has been created and is live.'
-                    : 'Your event has been submitted for approval.',
+                description: 'Your event has been submitted for approval.',
             });
 
             // Organizer flow – go to My Events

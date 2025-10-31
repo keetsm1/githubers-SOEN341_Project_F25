@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
@@ -20,6 +20,7 @@ import path from 'path';
 
 const Navigation = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
 
   if (!user) return null;
@@ -113,7 +114,7 @@ const Navigation = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={logout}
+              onClick={() => { logout(); navigate('/'); }}
               className="text-muted-foreground hover:text-foreground"
             >
               <LogOut className="w-4 h-4" />

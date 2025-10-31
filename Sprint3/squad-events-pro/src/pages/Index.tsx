@@ -149,13 +149,7 @@ const Index = () => {
               <Calendar className="w-4 h-4 mr-2" />
               Browse Events
             </Button>
-            <Button 
-              variant="outline"
-              onClick={() => navigate('/create-event')}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Event
-            </Button>
+            
             <Button 
               variant="outline"
               onClick={() => navigate('/friends')}

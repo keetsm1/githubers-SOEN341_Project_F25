@@ -7,6 +7,18 @@ import Navigation from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from '@/components/auth/LoginForm';
 import { db } from '@/services/database';
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 import { Calendar, MapPin, Users, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -18,6 +30,10 @@ const EventDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [event, setEvent] = useState<any | null>(null);
   const [isRSVPing, setIsRSVPing] = useState(false);
+  const [showRSVPDialog, setShowRSVPDialog] = useState(false);
+  const { toast } = useToast();
+  const [hasTicket, setHasTicket] = useState(false);
+  const [attendeeCount, setAttendeeCount] = useState<number>(0);
 
   const eventId = useMemo(() => id as string, [id]);
 
@@ -41,11 +57,19 @@ const EventDetails: React.FC = () => {
           currentAttendees: 0,
           imageUrl: row.image_url ?? undefined,
           tags: (row as any).tags ?? [],
-          isApproved: (row as any).status === 'published' || (row as any).status === true,
+          isApproved:
+            (row as any).status === true ||
+            (typeof (row as any).status === 'string' && ['published','approved'].includes(String((row as any).status).toLowerCase())),
           createdAt: (row as any).created_at,
           status: (row as any).status,
         };
         setEvent(mapped);
+        // Load initial attendee count
+        try {
+          const { db } = await import('@/services/database');
+          const c = await db.getEventTicketCount(mapped.id);
+          setAttendeeCount(c);
+        } catch {}
       } catch (e: any) {
         setError('Failed to load event.');
         // eslint-disable-next-line no-console
@@ -57,16 +81,78 @@ const EventDetails: React.FC = () => {
     load();
   }, [eventId]);
 
-  const handleRSVP = async () => {
+  // Realtime attendee count for this event
+  useEffect(() => {
+    if (!eventId) return;
+    let cleanup: (() => void) | undefined;
+    (async () => {
+      try {
+        const { subscribeToEventRegistrationCount } = await import('@/services/database');
+        cleanup = subscribeToEventRegistrationCount(eventId, (count) => setAttendeeCount(count));
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { if (cleanup) try { cleanup(); } catch {} };
+  }, [eventId]);
+
+  // Check if this user already RSVPed to this event
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      try {
+        if (!user || !eventId) return;
+        // Use session-bound lookup to avoid id mismatches
+        const already = await db.hasUserTicket(eventId);
+        if (mounted) setHasTicket(prev => prev || already);
+      } catch {}
+    };
+    run();
+    return () => { mounted = false; };
+  }, [eventId, user?.id]);
+
+  const handleRSVPConfirm = async () => {
     if (!user || !event) return;
     setIsRSVPing(true);
     try {
-      await db.createTicket(event.id, user.id);
-      navigate('/my-events');
+      // Prevent RSVPs to past events
+      const starts = new Date(event.date);
+      if (starts <= new Date()) {
+        toast({
+          variant: 'destructive',
+          title: 'Event Passed',
+          description: 'This event has already ended. RSVP is closed.',
+        });
+        return;
+      }
+      // Pre-check capacity to show a friendly message
+      const full = await db.isEventFull(event.id);
+      if (full) {
+        toast({
+          variant: 'destructive',
+          title: 'Event Full',
+          description: 'This event has reached its capacity.',
+        });
+        return;
+      }
+      const t = await db.createTicket(event.id);
+      // Optimistically bump local count
+      setAttendeeCount((c) => c + 1);
+      toast({
+        title: 'RSVP Successful!',
+        description: `Ticket created${t?.id ? ` (#${t.id})` : ''}. Check My Tickets to view it.`,
+      });
+      navigate('/my-tickets');
     } catch (e) {
-      alert('Unable to RSVP at this time.');
+      const msg = (e as any)?.message || 'Unable to RSVP at this time';
+      toast({
+        variant: 'destructive',
+        title: 'RSVP Failed',
+        description: msg,
+      });
     } finally {
       setIsRSVPing(false);
+      setShowRSVPDialog(false);
     }
   };
 
@@ -133,13 +219,39 @@ const EventDetails: React.FC = () => {
                   <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-primary" /> {format(new Date(event.date), 'PPP p')}</div>
                     <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-primary" /> {event.location}</div>
-                    <div className="flex items-center"><Users className="w-4 h-4 mr-2 text-primary" /> {event.currentAttendees} / {event.maxCapacity} attending</div>
+                    <div className="flex items-center"><Users className="w-4 h-4 mr-2 text-primary" /> {attendeeCount} / {event.maxCapacity} attending</div>
                   </div>
                 </div>
                 {user?.role === 'student' && (
-                  <Button onClick={handleRSVP} disabled={isRSVPing} className="bg-gradient-to-r from-primary to-primary/90">
-                    {isRSVPing ? 'RSVPing…' : 'RSVP'}
-                  </Button>
+                  hasTicket ? (
+                    <Button variant="outline" onClick={() => navigate('/my-tickets')}>
+                      View Ticket
+                    </Button>
+                  ) : event.isApproved ? (
+                    <AlertDialog open={showRSVPDialog} onOpenChange={setShowRSVPDialog}>
+                      <AlertDialogTrigger asChild>
+                        <Button onClick={() => setShowRSVPDialog(true)} disabled={isRSVPing} className="bg-gradient-to-r from-primary to-primary/90">
+                          {isRSVPing ? 'RSVPing…' : 'RSVP'}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirm RSVP</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to RSVP to <b>{event.title}</b>? This will secure your spot if available.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel disabled={isRSVPing}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction asChild>
+                            <Button onClick={handleRSVPConfirm} disabled={isRSVPing}>
+                              {isRSVPing ? 'RSVPing…' : 'Confirm RSVP'}
+                            </Button>
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : null
                 )}
               </div>
             </CardHeader>

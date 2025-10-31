@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Calendar, Ticket, Star } from 'lucide-react';
+import { format } from 'date-fns';
 import Navigation from '@/components/layout/Navigation';
 import EventCard from '@/components/events/EventCard';
 import StarredEvents from './StarredEvents';
@@ -10,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db, Event, Ticket as TicketType } from '@/services/database';
 import { useNavigate } from 'react-router-dom';
 import LoginForm from '@/components/auth/LoginForm';
+import { QRCodeSVG } from 'qrcode.react';
 
 const MyEvents = () => {
     const { user } = useAuth();
@@ -18,6 +30,7 @@ const MyEvents = () => {
     const [myTickets, setMyTickets] = useState<TicketType[]>([]);
     const [loading, setLoading] = useState(true);
     const [starredCount, setStarredCount] = useState(0);
+    const [qrToShow, setQrToShow] = useState<string | null>(null);
 
     useEffect(() => {
         if (user && user.role === 'student') {
@@ -222,7 +235,7 @@ const MyEvents = () => {
                                     </Card>
                                 ) : (
                                     <div className="space-y-4">
-                                        {myTickets.map((ticket) => (
+                                        {Array.from(new Map(myTickets.map((t) => [t.id || `${t.eventId}:${t.userId}`, t])).values()).map((ticket) => (
                                             <Card key={ticket.id} className="shadow-card">
                                                 <CardContent className="p-6">
                                                     <div className="flex items-center justify-between">
@@ -232,13 +245,13 @@ const MyEvents = () => {
                                                             <p className="text-sm text-muted-foreground">
                                                                 Status: {ticket.isCheckedIn ? 'Checked In' : 'Valid'}
                                                             </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                RSVP’d on {format(new Date(ticket.createdAt), 'PPP p')}
+                                                            </p>
                                                         </div>
                                                         <Button
                                                             variant="outline"
-                                                            onClick={() => {
-                                                                // Replace with a proper modal/QR viewer when ready
-                                                                alert(`QR Code: ${ticket.qrCode}`);
-                                                            }}
+                                                            onClick={() => setQrToShow(ticket.qrCode)}
                                                         >
                                                             View QR Code
                                                         </Button>
@@ -257,6 +270,39 @@ const MyEvents = () => {
                     )}
                 </Tabs>
             </div>
+
+            {/* QR Viewer Dialog */}
+            <AlertDialog open={qrToShow !== null} onOpenChange={(open) => !open && setQrToShow(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Ticket QR Code</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Present this QR at event check-in. You can also copy the raw code below.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="flex flex-col items-center gap-4 py-2">
+                        {qrToShow && (
+                            <div className="bg-white p-4 rounded-md border">
+                                <QRCodeSVG value={qrToShow} size={192} />
+                            </div>
+                        )}
+                        <code className="text-sm break-all text-center max-w-full">
+                            {qrToShow ?? ''}
+                        </code>
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setQrToShow(null)}>Close</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={async () => {
+                                if (!qrToShow) return;
+                                try { await navigator.clipboard.writeText(qrToShow); } catch {}
+                            }}
+                        >
+                            Copy Code
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 };

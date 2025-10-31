@@ -23,6 +23,7 @@ import ApproveEvents from "./pages/admin/ApproveEvents";
 
 // NEW: edit page route
 import EditEvent from "./pages/EditEvent";
+import MyTickets from "./pages/MyTickets";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
 
                         <Route path="/search" element={<SearchEvents />} />
                         <Route path="/my-events" element={<MyEvents />} />
+                        <Route path="/my-tickets" element={<MyTickets />} />
                         <Route path="/create-event" element={<CreateEvent />} />
 
                         {/* NEW: editing pending events */}

@@ -115,19 +115,48 @@ const SearchEvents: React.FC = () => {
     const handleRSVP = async (eventId: string) => {
         if (!user) return;
         try {
-            const ticket = await db.createTicket(eventId, user.id);
+            // Prevent RSVPs to past events (extra guard)
+            const ev = (allEvents as any[]).find((e: any) => (e.id ?? e.event_id) === eventId);
+            const startsAt = new Date(ev?.date ?? ev?.starts_at ?? 0);
+            if (!ev || !(startsAt instanceof Date) || Number.isNaN(startsAt.getTime())) {
+                // Best-effort fetch if not in current page
+                try {
+                    const mod = await import('@/services/database');
+                    const row: any = await mod.getEventById(eventId);
+                    const d = new Date(row?.starts_at ?? row?.date ?? 0);
+                    if (d <= new Date()) {
+                        toast({ variant: 'destructive', title: 'Event Passed', description: 'This event has already ended. RSVP is closed.' });
+                        return;
+                    }
+                } catch {}
+            } else if (startsAt <= new Date()) {
+                toast({ variant: 'destructive', title: 'Event Passed', description: 'This event has already ended. RSVP is closed.' });
+                return;
+            }
+            // Friendly pre-check to avoid avoidable RPC round-trips
+            const full = await db.isEventFull(eventId);
+            if (full) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Event Full',
+                    description: 'This event has reached its capacity.',
+                });
+                return;
+            }
+            const ticket = await db.createTicket(eventId);
             if (ticket) {
                 toast({
                     title: 'RSVP Successful!',
-                    description: 'Your ticket has been generated. Check My Events to view it.',
+                    description: 'Your ticket has been generated. Check My Tickets to view it.',
                 });
             }
             refetch();
-        } catch {
+        } catch (e: any) {
+            const msg = (e?.message as string) || 'Unable to RSVP at this time';
             toast({
                 variant: 'destructive',
                 title: 'RSVP Failed',
-                description: 'Unable to RSVP at this time',
+                description: msg,
             });
         }
     };

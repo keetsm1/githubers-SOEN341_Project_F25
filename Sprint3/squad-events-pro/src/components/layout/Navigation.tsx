@@ -11,7 +11,8 @@ import {
   Shield, 
   UserCheck,
   LogOut,
-  Home
+  Home,
+  Ticket
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ const Navigation = () => {
           { path: '/', label: 'Home', icon: Home },
           { path: '/search', label: 'Search Events', icon: Search },
           { path: '/my-events', label: 'My Events', icon: Calendar },
+          { path: '/my-tickets', label: 'My Tickets', icon: Ticket },
           { path: '/friends', label: 'Friends', icon: Users },
         ];
       case 'company':

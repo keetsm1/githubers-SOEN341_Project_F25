@@ -25,6 +25,55 @@ export const supabase = isSupabaseEnabled
     })
     : null;
 
+// Small helper to generate a random id when needed (fallback path)
+function cryptoRandomId() {
+    try {
+        // @ts-ignore
+        const arr = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto.getRandomValues(new Uint32Array(4)) : null;
+        if (arr) return Array.from(arr).map(n => n.toString(16)).join('');
+    } catch {}
+    return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+// Recently-joined cache to smooth UI immediately after RSVP across remounts
+const RECENT_JOIN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+function getLocalUid(): string | undefined {
+    try {
+        const raw = localStorage.getItem('campusUser');
+        return raw ? (JSON.parse(raw)?.id as string | undefined) : undefined;
+    } catch {
+        return undefined;
+    }
+}
+function setRecentlyJoined(uid: string, eventId: string) {
+    try {
+        const key = 'recentlyJoined';
+        const raw = localStorage.getItem(key);
+        const obj = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+        obj[`${uid}:${eventId}`] = Date.now();
+        localStorage.setItem(key, JSON.stringify(obj));
+    } catch {}
+}
+function wasRecentlyJoined(uid: string, eventId: string): boolean {
+    try {
+        const key = 'recentlyJoined';
+        const raw = localStorage.getItem(key);
+        if (!raw) return false;
+        const obj = JSON.parse(raw) as Record<string, number>;
+        const ts = obj[`${uid}:${eventId}`];
+        if (!ts) return false;
+        if (Date.now() - ts > RECENT_JOIN_TTL_MS) {
+            // Expired; clean entry
+            delete obj[`${uid}:${eventId}`];
+            localStorage.setItem(key, JSON.stringify(obj));
+            return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 /** ──────────────────────────────────────────────────────────────────────────
  *  Auth helpers (kept behavior; added ensureProfile)
  *  ────────────────────────────────────────────────────────────────────────── */
@@ -745,33 +794,187 @@ export const db = {
         if (eventIndex >= 0) mockEvents.splice(eventIndex, 1);
     },
 
-    /* ───────────── Tickets (mocked) ───────────── */
+    /* ───────────── Tickets (local storage backed for Sprint 2) ───────────── */
 
-    async createTicket(eventId: string, userId: string): Promise<Ticket> {
-        return {
+    async hasUserTicket(eventId: string, userId?: string): Promise<boolean> {
+        if (isSupabaseEnabled && supabase) {
+            // Always use the current session user to satisfy RLS
+            const uid = userId || await requireAuth();
+            // Fast-path: honor recent local join to avoid flicker after remount
+            if (wasRecentlyJoined(uid, eventId)) return true;
+            const { count, error } = await supabase
+                .from('registrations')
+                .select('registration_id', { head: true, count: 'exact' })
+                .eq('event_id', eventId)
+                .eq('user_id', uid);
+            if (error) throw error;
+            return (count ?? 0) > 0;
+        }
+        // Local storage fallback
+        const { readJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        if (!userId) return false;
+        // Also honor recent local join cache
+        return all.some(t => t.eventId === eventId && t.userId === userId) ||
+            (getLocalUid() ? wasRecentlyJoined(getLocalUid() as string, eventId) : false);
+    },
+
+    async createTicket(eventId: string, _userId?: string): Promise<Ticket> {
+        if (isSupabaseEnabled && supabase) {
+            // Always use the current session user; ignore any external id to avoid mismatch
+            const uid = await requireAuth();
+            // Prefer atomic RPC if available
+            const { data: rpcData, error: rpcError } = await supabase.rpc('register_for_event', {
+                p_event_id: eventId,
+            });
+            if (!rpcError && rpcData) {
+                // Mark recently joined for flicker-free UI
+                setRecentlyJoined(uid, eventId);
+                return {
+                    id: (rpcData as any).registration_id ?? (rpcData as any).id ?? cryptoRandomId(),
+                    eventId: (rpcData as any).event_id ?? eventId,
+                    userId: uid,
+                    qrCode: `QR_${eventId}_${uid}_${Date.now()}`,
+                    isCheckedIn: false,
+                    createdAt: (rpcData as any).created_at ?? new Date().toISOString(),
+                } as Ticket;
+            }
+            // Fallback to safe client-side checks + insert with unique constraint
+            if (rpcError) {
+                const msg = (rpcError as any)?.message || '';
+                if (/already registered/i.test(msg) || (rpcError as any)?.code === '23505') {
+                    throw new Error('You have already RSVPed to this event.');
+                }
+                if (/capacity/i.test(msg)) {
+                    throw new Error('Event is at capacity.');
+                }
+                if (/not published/i.test(msg)) {
+                    throw new Error('Event is not published.');
+                }
+            }
+            // As a last resort, try insert; rely on unique constraint to block dupes
+            const { data, error } = await supabase
+                .from('registrations')
+                .insert({ event_id: eventId, user_id: uid })
+                .select('registration_id, event_id, user_id, created_at')
+                .single();
+            if (error) {
+                const code = (error as any)?.code;
+                if (code === '23505') {
+                    throw new Error('You have already RSVPed to this event.');
+                }
+                throw error;
+            }
+            setRecentlyJoined(uid, eventId);
+            return {
+                id: (data as any).registration_id,
+                eventId: (data as any).event_id,
+                userId: (data as any).user_id,
+                qrCode: `QR_${eventId}_${uid}_${Date.now()}`,
+                isCheckedIn: false,
+                createdAt: (data as any).created_at,
+            } as Ticket;
+        }
+
+        // Local storage fallback
+        const { readJSON, writeJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        const uidLS = _userId || (() => {
+            try {
+                const raw = localStorage.getItem('campusUser');
+                return raw ? (JSON.parse(raw)?.id as string | undefined) : undefined;
+            } catch { return undefined; }
+        })() || 'local-user';
+        const exists = all.find(t => t.eventId === eventId && t.userId === uidLS);
+        if (exists) {
+            throw new Error('You have already RSVPed to this event.');
+        }
+        try {
+            const ev = await getEventById(eventId);
+            const cap = ev?.max_cap ?? null;
+            if (cap !== null && typeof cap === 'number' && cap > 0) {
+                const currentCount = all.filter(t => t.eventId === eventId).length;
+                if (currentCount >= cap) {
+                    throw new Error('Event is at capacity.');
+                }
+            }
+        } catch {}
+        const ticket: Ticket = {
             id: Date.now().toString(),
             eventId,
-            userId,
-            qrCode: `QR_${eventId}_${userId}_${Date.now()}`,
+            userId: uidLS,
+            qrCode: `QR_${eventId}_${uidLS}_${Date.now()}`,
             isCheckedIn: false,
             createdAt: new Date().toISOString(),
         };
+        writeJSON<Ticket[]>('tickets', [ticket, ...all]);
+        setRecentlyJoined(uidLS, eventId);
+        return ticket;
     },
 
     async getUserTickets(userId: string): Promise<Ticket[]> {
-        return []; // mocked
+        if (isSupabaseEnabled && supabase) {
+            const uid = await requireAuth();
+            if (uid !== userId) throw new Error('Unauthorized');
+            const { data, error } = await supabase
+                .from('registrations')
+                .select('registration_id, event_id, user_id, created_at')
+                .eq('user_id', uid)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            return (data ?? []).map((r: any) => ({
+                id: r.registration_id,
+                eventId: r.event_id,
+                userId: r.user_id,
+                qrCode: `QR_${r.event_id}_${r.user_id}_${new Date(r.created_at).getTime()}`,
+                isCheckedIn: false,
+                createdAt: r.created_at,
+            }));
+        }
+        const { readJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        return all.filter(t => t.userId === userId);
     },
 
     async checkInTicket(ticketId: string): Promise<Ticket> {
-        return {
-            id: ticketId,
-            eventId: '1',
-            userId: '1',
-            qrCode: `QR_${ticketId}`,
+        const { readJSON, writeJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        const idx = all.findIndex(t => t.id === ticketId);
+        if (idx === -1) throw new Error('Ticket not found');
+        const updated: Ticket = {
+            ...all[idx],
             isCheckedIn: true,
             checkedInAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
         };
+        all[idx] = updated;
+        writeJSON<Ticket[]>('tickets', all);
+        return updated;
+    },
+
+    async getEventTicketCount(eventId: string): Promise<number> {
+        if (isSupabaseEnabled && supabase) {
+            const { count, error } = await supabase
+                .from('registrations')
+                .select('registration_id', { count: 'exact', head: true })
+                .eq('event_id', eventId);
+            if (error) throw error;
+            return count ?? 0;
+        }
+        const { readJSON } = await import('@/lib/storage');
+        const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
+        return all.filter(t => t.eventId === eventId).length;
+    },
+
+    async isEventFull(eventId: string): Promise<boolean> {
+        try {
+            const ev = await getEventById(eventId);
+            const cap = ev?.max_cap ?? null;
+            if (!cap || cap <= 0) return false;
+            const count = await db.getEventTicketCount(eventId);
+            return count >= cap;
+        } catch {
+            return false;
+        }
     },
 
     /* ───────────── Friends (Supabase-backed) ───────────── */

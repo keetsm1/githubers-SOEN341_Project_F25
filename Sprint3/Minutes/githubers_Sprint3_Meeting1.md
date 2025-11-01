@@ -12,11 +12,11 @@
         </tr>
         <tr>
             <td>Meeting Time</td>
-            <td>17:00 – 18:10 (1h10)</td>
+            <td>18:30 – 19:40 (1h10)</td>
         </tr>
         <tr>
             <td>Meeting Format</td>
-            <td>Online (Discord)</td>
+            <td>In person</td>
         </tr>
       </table>
     </td>
@@ -31,7 +31,7 @@
         </tr>
         <tr>
           <td>Present</td>
-          <td>Ranjit, Widjane, Kevin, Arnav, Hotplate5, Saad, Gunkeet</td>
+          <td>Ranjit, Widjane, Kevin, Arnav, Lorne, Saad, Gunkeet</td>
         </tr>
         <tr>
           <td>Absent</td>

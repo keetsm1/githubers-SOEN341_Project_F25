@@ -20,6 +20,7 @@ import SignUp from "./components/auth/SignUp";
 import OrgSignUp from "./components/auth/OrgSignUp";
 import EventDetails from "./pages/EventDetails";
 import ApproveEvents from "./pages/admin/ApproveEvents";
+import Scan from "./pages/Scan";
 
 // NEW: edit page route
 import EditEvent from "./pages/EditEvent";
@@ -60,6 +61,7 @@ const App = () => (
                         <Route path="/approve-events" element={<ApproveEvents />} />
                         <Route path="/all-events" element={<AllEvents />} />
                         <Route path="/stats" element={<Stats />} />
+                        <Route path="/scan/:id" element={<Scan />} />
                         <Route path="/events/:id" element={<EventDetails />} />
 
                         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

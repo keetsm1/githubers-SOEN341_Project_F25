@@ -12,14 +12,20 @@ import {
 import Navigation from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { db, Analytics as AnalyticsType, Event } from '@/services/database';
+import { supabase, isSupabaseEnabled } from '@/lib/supabase';
 import LoginForm from '@/components/auth/LoginForm';
 import { Button } from '@/components/ui/button';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import { LineChart, CartesianGrid, XAxis, YAxis, Line, Tooltip, Legend } from 'recharts';
 
 const Analytics = () => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsType | null>(null);
   const [myEvents, setMyEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recent, setRecent] = useState<Array<{ action: string; event: string; time: string }>>([]);
+  const [trend, setTrend] = useState<{ date: string; rsvps: number; checkins: number }[]>([]);
+  const [series, setSeries] = useState<'rsvps' | 'checkins'>('rsvps');
 
   useEffect(() => {
     if (user?.role === 'company') {
@@ -33,12 +39,38 @@ const Analytics = () => {
     try {
       // Load company's events
       const eventsResponse = await db.getEvents({ organizerId: user.id });
-      setMyEvents(eventsResponse.data);
+      let events = eventsResponse.data;
 
-      // Load analytics for first event (in real app, would aggregate all events)
-      if (eventsResponse.data.length > 0) {
-        const eventAnalytics = await db.getEventStats(eventsResponse.data[0].id);
-        setAnalytics(eventAnalytics);
+      // Fetch attendance counts for these events
+      const attendance = await db.getEventAttendance(events.map((e) => e.id));
+      events = events.map((e) => {
+        const a = attendance[e.id];
+        return { ...e, currentAttendees: a ? a.total : 0 };
+      });
+      setMyEvents(events);
+
+      // Organizer-level aggregated analytics
+      const organizerAnalytics = await db.getOrganizerStats(user.id);
+      setAnalytics(organizerAnalytics);
+
+      // Dual-series trend (RSVPs vs Check-ins)
+      const t = await db.getOrganizerTrends(user.id);
+      setTrend(t);
+
+      // Recent activity: latest ticket creations across organizer's events
+      if (isSupabaseEnabled && supabase && events.length > 0) {
+        const { data } = await supabase
+          .from('tickets')
+          .select('created_at, event_id, events!inner(title)')
+          .in('event_id', events.map((e) => e.id))
+          .order('created_at', { ascending: false })
+          .limit(5);
+        const mapped = (data ?? []).map((row: any) => ({
+          action: 'New registration',
+          event: row.events?.title ?? 'Event',
+          time: new Date(row.created_at).toLocaleString(),
+        }));
+        setRecent(mapped);
       }
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -81,10 +113,12 @@ const Analytics = () => {
               Track your events performance and engagement
             </p>
           </div>
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export Report
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Export Report
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -111,7 +145,7 @@ const Analytics = () => {
                       <p className="text-3xl font-bold text-primary">{myEvents.length}</p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
-                        +12% from last month
+                        Organizer events
                       </p>
                     </div>
                     <Calendar className="w-8 h-8 text-primary opacity-80" />
@@ -127,7 +161,7 @@ const Analytics = () => {
                       <p className="text-3xl font-bold text-accent">{analytics?.totalRegistrations || 0}</p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
-                        +8% from last week
+                        Across all your events
                       </p>
                     </div>
                     <Users className="w-8 h-8 text-accent opacity-80" />
@@ -143,7 +177,7 @@ const Analytics = () => {
                       <p className="text-3xl font-bold text-primary">{analytics?.attendanceRate || 0}%</p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
-                        Above average
+                        Checked-in / Tickets
                       </p>
                     </div>
                     <Target className="w-8 h-8 text-primary opacity-80" />
@@ -155,11 +189,11 @@ const Analytics = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Revenue Impact</p>
-                      <p className="text-3xl font-bold text-accent">$2.4K</p>
+                      <p className="text-sm text-muted-foreground">Checked-in</p>
+                      <p className="text-3xl font-bold text-accent">{analytics?.checkedIn || 0}</p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
-                        +15% growth
+                        Total attendees checked-in
                       </p>
                     </div>
                     <BarChart3 className="w-8 h-8 text-accent opacity-80" />
@@ -197,37 +231,38 @@ const Analytics = () => {
                 </CardContent>
               </Card>
 
-              {/* Registration Trends */}
+              {/* Trends */}
               <Card className="shadow-card">
                 <CardHeader>
-                  <CardTitle>Registration Trends</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">This Week</span>
-                      <span className="font-semibold">32 registrations</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-primary h-2 rounded-full" style={{ width: '85%' }} />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Last Week</span>
-                      <span className="font-semibold">28 registrations</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-accent h-2 rounded-full" style={{ width: '70%' }} />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Month Average</span>
-                      <span className="font-semibold">25 registrations</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-muted-foreground h-2 rounded-full" style={{ width: '65%' }} />
+                  <div className="flex items-center justify-between">
+                    <CardTitle>{series === 'rsvps' ? 'RSVPs' : 'Check-ins'} (Last 14 days)</CardTitle>
+                    <div className="flex gap-2 text-xs">
+                      <Button size="sm" variant={series === 'rsvps' ? 'default' : 'outline'} onClick={() => setSeries('rsvps')}>RSVPs</Button>
+                      <Button size="sm" variant={series === 'checkins' ? 'default' : 'outline'} onClick={() => setSeries('checkins')}>Check-ins</Button>
                     </div>
                   </div>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      rsvps: { label: 'RSVPs', color: 'hsl(var(--primary))' },
+                      checkins: { label: 'Check-ins', color: 'hsl(var(--accent))' },
+                    }}
+                    className="w-full h-[280px]"
+                  >
+                    <LineChart data={trend} margin={{ left: 12, right: 12 }}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+                      <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={30} />
+                      <Tooltip content={<ChartTooltipContent />} />
+                      <Legend content={<ChartLegendContent />} />
+                      {series === 'rsvps' ? (
+                        <Line type="monotone" dataKey="rsvps" stroke="var(--color-rsvps)" dot={false} strokeWidth={2} />
+                      ) : (
+                        <Line type="monotone" dataKey="checkins" stroke="var(--color-checkins)" dot={false} strokeWidth={2} />
+                      )}
+                    </LineChart>
+                  </ChartContainer>
                 </CardContent>
               </Card>
             </div>
@@ -239,16 +274,9 @@ const Analytics = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[
-                    { action: 'New registration', event: 'AI Workshop', time: '2 minutes ago', type: 'positive' },
-                    { action: 'Event approved', event: 'Career Fair 2024', time: '1 hour ago', type: 'positive' },
-                    { action: 'Ticket checked in', event: 'AI Workshop', time: '3 hours ago', type: 'neutral' },
-                    { action: 'New registration', event: 'Study Session', time: '5 hours ago', type: 'positive' },
-                  ].map((activity, index) => (
+                  {(recent.length ? recent : []).map((activity, index) => (
                     <div key={index} className="flex items-center space-x-4 p-3 border-l-4 border-l-primary bg-muted/20 rounded-r-lg">
-                      <div className={`w-2 h-2 rounded-full ${
-                        activity.type === 'positive' ? 'bg-green-500' : 'bg-blue-500'
-                      }`} />
+                      <div className={`w-2 h-2 rounded-full bg-green-500`} />
                       <div className="flex-1">
                         <p className="text-sm font-medium">{activity.action}</p>
                         <p className="text-xs text-muted-foreground">{activity.event}</p>
@@ -256,6 +284,9 @@ const Analytics = () => {
                       <span className="text-xs text-muted-foreground">{activity.time}</span>
                     </div>
                   ))}
+                  {recent.length === 0 && (
+                    <div className="text-sm text-muted-foreground">No recent activity.</div>
+                  )}
                 </div>
               </CardContent>
             </Card>

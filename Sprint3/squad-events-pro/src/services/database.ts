@@ -925,43 +925,383 @@ export const db = {
         };
     },
 
-    /* ───────────── Analytics (mocked) ───────────── */
+    /* ───────────── Analytics (Supabase-backed) ───────────── */
 
     async getGlobalStats(): Promise<Analytics> {
+        if (!supabase) {
+            // Fallback minimal zeros if Supabase is not configured
+            return {
+                totalRegistrations: 0,
+                ticketsSold: 0,
+                checkedIn: 0,
+                attendanceRate: 0,
+                eventsByCategory: {},
+                registrationTrend: [],
+            };
+        }
+
+        // Count all tickets
+        const { count: ticketsCount } = await supabase
+            .from('tickets')
+            .select('*', { count: 'exact', head: true });
+
+        // Count checked-in tickets
+        const { count: checkedCount } = await supabase
+            .from('tickets')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_checked_in', true);
+
+        // Events by category (number of registrations per category)
+        // Join tickets -> events to aggregate by category
+        const { data: byCatRows } = await supabase
+            .from('tickets')
+            .select('event_id, events!inner(category)');
+
+        const eventsByCategory: Record<string, number> = {};
+        (byCatRows ?? []).forEach((r: any) => {
+            const cat = r.events?.category ?? 'Uncategorized';
+            eventsByCategory[cat] = (eventsByCategory[cat] || 0) + 1;
+        });
+
+        // Registration trend for last 14 days
+        const since = new Date();
+        since.setDate(since.getDate() - 13);
+        const sinceIso = since.toISOString();
+        const { data: trendRows } = await supabase
+            .from('tickets')
+            .select('created_at')
+            .gte('created_at', sinceIso)
+            .order('created_at', { ascending: true });
+
+        const trendMap: Record<string, number> = {};
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(since);
+            d.setDate(since.getDate() + i);
+            const key = d.toISOString().slice(0, 10);
+            trendMap[key] = 0;
+        }
+        (trendRows ?? []).forEach((row: any) => {
+            const key = new Date(row.created_at).toISOString().slice(0, 10);
+            if (trendMap[key] !== undefined) trendMap[key] += 1;
+        });
+
+        const total = ticketsCount || 0;
+        const checked = checkedCount || 0;
+        const attendanceRate = total > 0 ? Math.round((checked / total) * 100) : 0;
+
         return {
-            totalRegistrations: 96,
-            ticketsSold: 100,
-            checkedIn: 83,
-            attendanceRate: 83,
-            eventsByCategory: {
-                Technology: 15,
-                Career: 8,
-                Sports: 12,
-                Arts: 6,
-                Social: 20,
-            },
-            registrationTrend: [
-                { date: '2024-09-01', count: 5 },
-                { date: '2024-09-02', count: 8 },
-                { date: '2024-09-03', count: 12 },
-                { date: '2024-09-04', count: 15 },
-                { date: '2024-09-05', count: 22 },
-            ],
+            totalRegistrations: total,
+            ticketsSold: total,
+            checkedIn: checked,
+            attendanceRate,
+            eventsByCategory,
+            registrationTrend: Object.keys(trendMap)
+                .sort()
+                .map((date) => ({ date, count: trendMap[date] })),
         };
     },
 
     async getEventStats(eventId: string): Promise<Analytics> {
+        if (!supabase) {
+            return {
+                totalRegistrations: 0,
+                ticketsSold: 0,
+                checkedIn: 0,
+                attendanceRate: 0,
+                eventsByCategory: {},
+                registrationTrend: [],
+            };
+        }
+
+        // Tickets for this event
+        const { count: ticketsCount } = await supabase
+            .from('tickets')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', eventId);
+
+        const { count: checkedCount } = await supabase
+            .from('tickets')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', eventId)
+            .eq('is_checked_in', true);
+
+        // Category for the event
+        const { data: ev } = await supabase
+            .from('events')
+            .select('category')
+            .eq('event_id', eventId)
+            .maybeSingle();
+
+        const since = new Date();
+        since.setDate(since.getDate() - 13);
+        const sinceIso = since.toISOString();
+        const { data: trendRows } = await supabase
+            .from('tickets')
+            .select('created_at')
+            .eq('event_id', eventId)
+            .gte('created_at', sinceIso)
+            .order('created_at', { ascending: true });
+
+        const trendMap: Record<string, number> = {};
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(since);
+            d.setDate(since.getDate() + i);
+            const key = d.toISOString().slice(0, 10);
+            trendMap[key] = 0;
+        }
+        (trendRows ?? []).forEach((row: any) => {
+            const key = new Date(row.created_at).toISOString().slice(0, 10);
+            if (trendMap[key] !== undefined) trendMap[key] += 1;
+        });
+
+        const total = ticketsCount || 0;
+        const checked = checkedCount || 0;
+        const attendanceRate = total > 0 ? Math.round((checked / total) * 100) : 0;
+
         return {
-            totalRegistrations: 32,
-            ticketsSold: 35,
-            checkedIn: 28,
-            attendanceRate: 80,
-            eventsByCategory: {},
-            registrationTrend: [
-                { date: '2024-09-20', count: 5 },
-                { date: '2024-09-21', count: 12 },
-                { date: '2024-09-22', count: 15 },
-            ],
+            totalRegistrations: total,
+            ticketsSold: total,
+            checkedIn: checked,
+            attendanceRate,
+            eventsByCategory: ev?.category ? { [ev.category]: total } : {},
+            registrationTrend: Object.keys(trendMap)
+                .sort()
+                .map((date) => ({ date, count: trendMap[date] })),
         };
+    },
+
+    // Aggregate stats across all events created by an organizer
+    async getOrganizerStats(organizerUserId: string): Promise<Analytics> {
+        if (!supabase) {
+            return {
+                totalRegistrations: 0,
+                ticketsSold: 0,
+                checkedIn: 0,
+                attendanceRate: 0,
+                eventsByCategory: {},
+                registrationTrend: [],
+            };
+        }
+
+        // First get all event ids created by this user
+        const { data: eventsRows, error: evErr } = await supabase
+            .from('events')
+            .select('event_id, category, created_by')
+            .eq('created_by', organizerUserId);
+        if (evErr) throw evErr;
+        const eventIds = (eventsRows ?? []).map((e: any) => e.event_id);
+        if (eventIds.length === 0) {
+            return {
+                totalRegistrations: 0,
+                ticketsSold: 0,
+                checkedIn: 0,
+                attendanceRate: 0,
+                eventsByCategory: {},
+                registrationTrend: [],
+            };
+        }
+
+        // Tickets for these events
+        const { count: total } = await supabase
+            .from('tickets')
+            .select('*', { count: 'exact', head: true })
+            .in('event_id', eventIds);
+
+        const { count: checked } = await supabase
+            .from('tickets')
+            .select('*', { count: 'exact', head: true })
+            .in('event_id', eventIds)
+            .eq('is_checked_in', true);
+
+        // Category aggregation (events x tickets)
+        const eventsByCategory: Record<string, number> = {};
+        const { data: catJoin } = await supabase
+            .from('tickets')
+            .select('event_id, events!inner(category)')
+            .in('event_id', eventIds);
+        (catJoin ?? []).forEach((r: any) => {
+            const cat = r.events?.category ?? 'Uncategorized';
+            eventsByCategory[cat] = (eventsByCategory[cat] || 0) + 1;
+        });
+
+        // Registration trend
+        const since = new Date();
+        since.setDate(since.getDate() - 13);
+        const sinceIso = since.toISOString();
+        const { data: trendRows } = await supabase
+            .from('tickets')
+            .select('created_at, event_id')
+            .in('event_id', eventIds)
+            .gte('created_at', sinceIso)
+            .order('created_at', { ascending: true });
+
+        const trendMap: Record<string, number> = {};
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(since);
+            d.setDate(since.getDate() + i);
+            const key = d.toISOString().slice(0, 10);
+            trendMap[key] = 0;
+        }
+        (trendRows ?? []).forEach((row: any) => {
+            const key = new Date(row.created_at).toISOString().slice(0, 10);
+            if (trendMap[key] !== undefined) trendMap[key] += 1;
+        });
+
+        const totalCount = total || 0;
+        const checkedCount = checked || 0;
+        const attendanceRate = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
+
+        return {
+            totalRegistrations: totalCount,
+            ticketsSold: totalCount,
+            checkedIn: checkedCount,
+            attendanceRate,
+            eventsByCategory,
+            registrationTrend: Object.keys(trendMap)
+                .sort()
+                .map((date) => ({ date, count: trendMap[date] })),
+        };
+    },
+
+    // Utility: get per-event attendance numbers for a list of events
+    async getEventAttendance(eventIds: string[]): Promise<Record<string, { total: number; checkedIn: number }>> {
+        const result: Record<string, { total: number; checkedIn: number }> = {};
+        if (!supabase || eventIds.length === 0) return result;
+
+        const { data: allTickets } = await supabase
+            .from('tickets')
+            .select('event_id, is_checked_in')
+            .in('event_id', eventIds);
+
+        (allTickets ?? []).forEach((t: any) => {
+            const key = t.event_id as string;
+            if (!result[key]) result[key] = { total: 0, checkedIn: 0 };
+            result[key].total += 1;
+            if (t.is_checked_in) result[key].checkedIn += 1;
+        });
+
+        return result;
+    },
+
+    // Trends: RSVPs vs Check-ins for all events by organizer (last 14 days)
+    async getOrganizerTrends(organizerUserId: string): Promise<TrendPoint[]> {
+        if (!supabase) return [];
+        const since = new Date();
+        since.setDate(since.getDate() - 13);
+        const sinceIso = since.toISOString();
+
+        // All events for organizer
+        const { data: eventsRows, error: evErr } = await supabase
+            .from('events')
+            .select('event_id')
+            .eq('created_by', organizerUserId);
+        if (evErr) throw evErr;
+        const eventIds = (eventsRows ?? []).map((e: any) => e.event_id);
+        if (eventIds.length === 0) return [];
+
+        // RSVPs per day
+        const { data: rsvps } = await supabase
+            .from('tickets')
+            .select('created_at')
+            .in('event_id', eventIds)
+            .gte('created_at', sinceIso);
+
+        // Check-ins per day (prefer checked_in_at if available, else created_at where is_checked_in true)
+        const { data: chRows } = await supabase
+            .from('tickets')
+            .select('checked_in_at, created_at, is_checked_in')
+            .in('event_id', eventIds)
+            .eq('is_checked_in', true)
+            .gte('created_at', sinceIso);
+
+        const map: Record<string, { r: number; c: number }> = {};
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(since);
+            d.setDate(since.getDate() + i);
+            map[d.toISOString().slice(0, 10)] = { r: 0, c: 0 };
+        }
+        (rsvps ?? []).forEach((row: any) => {
+            const key = new Date(row.created_at).toISOString().slice(0, 10);
+            if (map[key]) map[key].r += 1;
+        });
+        (chRows ?? []).forEach((row: any) => {
+            const source = row.checked_in_at ?? row.created_at;
+            const key = new Date(source).toISOString().slice(0, 10);
+            if (map[key]) map[key].c += 1;
+        });
+
+        return Object.keys(map)
+            .sort()
+            .map((date) => ({ date, rsvps: map[date].r, checkins: map[date].c }));
+    },
+
+    // Trends for a single event (last 14 days)
+    async getEventTrends(eventId: string): Promise<TrendPoint[]> {
+        if (!supabase) return [];
+        const since = new Date();
+        since.setDate(since.getDate() - 13);
+        const sinceIso = since.toISOString();
+
+        const { data: rsvps } = await supabase
+            .from('tickets')
+            .select('created_at')
+            .eq('event_id', eventId)
+            .gte('created_at', sinceIso);
+
+        const { data: chRows } = await supabase
+            .from('tickets')
+            .select('checked_in_at, created_at, is_checked_in')
+            .eq('event_id', eventId)
+            .eq('is_checked_in', true)
+            .gte('created_at', sinceIso);
+
+        const map: Record<string, { r: number; c: number }> = {};
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(since);
+            d.setDate(since.getDate() + i);
+            map[d.toISOString().slice(0, 10)] = { r: 0, c: 0 };
+        }
+        (rsvps ?? []).forEach((row: any) => {
+            const key = new Date(row.created_at).toISOString().slice(0, 10);
+            if (map[key]) map[key].r += 1;
+        });
+        (chRows ?? []).forEach((row: any) => {
+            const source = row.checked_in_at ?? row.created_at;
+            const key = new Date(source).toISOString().slice(0, 10);
+            if (map[key]) map[key].c += 1;
+        });
+
+        return Object.keys(map)
+            .sort()
+            .map((date) => ({ date, rsvps: map[date].r, checkins: map[date].c }));
+    },
+
+    // Validate QR and mark check-in if organizer owns the event
+    async validateAndCheckInTicket(qrCode: string, organizerUserId: string, eventId?: string): Promise<{ ok: boolean; message: string }> {
+        if (!supabase) throw new Error('Supabase not configured');
+        // Find ticket by qr code and ensure event belongs to organizer
+        let query = supabase
+            .from('tickets')
+            .select('ticket_id, event_id, is_checked_in, checked_in_at, qr_code, events!inner(event_id, created_by, title)')
+            .eq('qr_code', qrCode);
+        if (eventId) {
+            query = query.eq('event_id', eventId);
+        }
+        const { data: ticketRow, error } = await query.maybeSingle();
+        if (error) throw error;
+        if (!ticketRow) return { ok: false, message: 'Ticket not found' };
+        if (ticketRow.events?.created_by !== organizerUserId) {
+            return { ok: false, message: 'You are not the organizer for this event' };
+        }
+        if (ticketRow.is_checked_in) {
+            return { ok: true, message: 'Already checked in' };
+        }
+        const now = new Date().toISOString();
+        const { error: updErr } = await supabase
+            .from('tickets')
+            .update({ is_checked_in: true, checked_in_at: now })
+            .eq('ticket_id', ticketRow.ticket_id);
+        if (updErr) throw updErr;
+        return { ok: true, message: 'Check-in successful' };
     },
 };

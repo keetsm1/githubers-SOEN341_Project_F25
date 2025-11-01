@@ -7,7 +7,9 @@ import Navigation from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from '@/components/auth/LoginForm';
 import { db } from '@/services/database';
-import { Calendar, MapPin, Users, ArrowLeft } from 'lucide-react';
+import { Calendar, MapPin, Users, ArrowLeft, BarChart3, Target, ScanQrCode } from 'lucide-react';
+import { ChartContainer, ChartTooltipContent, ChartLegendContent } from '@/components/ui/chart';
+import { LineChart, CartesianGrid, XAxis, YAxis, Line, Tooltip, Legend } from 'recharts';
 import { format } from 'date-fns';
 
 const EventDetails: React.FC = () => {
@@ -18,6 +20,8 @@ const EventDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [event, setEvent] = useState<any | null>(null);
   const [isRSVPing, setIsRSVPing] = useState(false);
+  const [eventAnalytics, setEventAnalytics] = useState<import('@/services/database').Analytics | null>(null);
+  const [trend, setTrend] = useState<{ date: string; rsvps: number; checkins: number }[]>([]);
 
   const eventId = useMemo(() => id as string, [id]);
 
@@ -46,6 +50,15 @@ const EventDetails: React.FC = () => {
           status: (row as any).status,
         };
         setEvent(mapped);
+        // Load per-event analytics and trends for organizers
+        if (user && (user.role === 'company' || user.role === 'admin')) {
+          if (mapped.organizerId === user.id) {
+            const analytics = await (await import('@/services/database')).db.getEventStats(mapped.id);
+            setEventAnalytics(analytics);
+            const trendData = await (await import('@/services/database')).db.getEventTrends(mapped.id);
+            setTrend(trendData);
+          }
+        }
       } catch (e: any) {
         setError('Failed to load event.');
         // eslint-disable-next-line no-console
@@ -55,7 +68,7 @@ const EventDetails: React.FC = () => {
       }
     };
     load();
-  }, [eventId]);
+  }, [eventId, user]);
 
   const handleRSVP = async () => {
     if (!user || !event) return;
@@ -141,6 +154,11 @@ const EventDetails: React.FC = () => {
                     {isRSVPing ? 'RSVPing…' : 'RSVP'}
                   </Button>
                 )}
+                {user && (user.role === 'company' || user.role === 'admin') && event.organizerId === user.id && (
+                  <Button variant="outline" onClick={() => navigate(`/scan/${event.id}`)}>
+                    <ScanQrCode className="w-4 h-4 mr-2" /> Scan Tickets
+                  </Button>
+                )}
               </div>
             </CardHeader>
 
@@ -159,6 +177,77 @@ const EventDetails: React.FC = () => {
                     {event.tags.map((t: string, i: number) => (
                       <Badge key={i} variant="outline">{t}</Badge>
                     ))}
+                  </div>
+                </section>
+              )}
+
+              {user && (user.role === 'company' || user.role === 'admin') && user.id === event.organizerId && (
+                <section>
+                  <h3 className="font-semibold mb-3">Event Analytics</h3>
+                  {!eventAnalytics ? (
+                    <div className="text-sm text-muted-foreground">Loading analytics…</div>
+                  ) : (
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Registrations</p>
+                              <p className="text-2xl font-bold">{eventAnalytics.totalRegistrations}</p>
+                            </div>
+                            <Users className="w-6 h-6 text-accent" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Checked-in</p>
+                              <p className="text-2xl font-bold">{eventAnalytics.checkedIn}</p>
+                            </div>
+                            <BarChart3 className="w-6 h-6 text-primary" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Attendance Rate</p>
+                              <p className="text-2xl font-bold">{eventAnalytics.attendanceRate}%</p>
+                            </div>
+                            <Target className="w-6 h-6 text-primary" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                  <div className="mt-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>RSVPs vs Check-ins (Last 14 days)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ChartContainer
+                          config={{
+                            rsvps: { label: 'RSVPs', color: 'hsl(var(--primary))' },
+                            checkins: { label: 'Check-ins', color: 'hsl(var(--accent))' },
+                          }}
+                          className="w-full h-[240px]"
+                        >
+                          <LineChart data={trend} margin={{ left: 12, right: 12 }}>
+                            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+                            <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={30} />
+                            <Tooltip content={<ChartTooltipContent />} />
+                            <Legend content={<ChartLegendContent />} />
+                            <Line type="monotone" dataKey="rsvps" stroke="var(--color-rsvps)" dot={false} strokeWidth={2} />
+                            <Line type="monotone" dataKey="checkins" stroke="var(--color-checkins)" dot={false} strokeWidth={2} />
+                          </LineChart>
+                        </ChartContainer>
+                      </CardContent>
+                    </Card>
                   </div>
                 </section>
               )}

@@ -8,7 +8,7 @@
         </tr>
         <tr>
             <td>Meeting Date</td>
-            <td>October 13, 2025</td>
+            <td>October 23, 2025</td>
         </tr>
         <tr>
             <td>Meeting Time</td>

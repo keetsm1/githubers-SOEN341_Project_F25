@@ -40,14 +40,24 @@ const ApproveEvents: React.FC = () => {
         const { data, error } = await supabase
             .from('events')
             .select('event_id, title, description, starts_at, ends_at, location, max_cap, image_url, status, created_at, created_by, org_name')
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(200);
 
         if (error) {
             toast({ title: 'Failed to load events', description: error.message, variant: 'destructive' });
             setEvents([]);
         } else {
-            setEvents((data as PendingEvent[]) ?? []);
+            const rows = (data as PendingEvent[]) ?? [];
+            const isPending = (s: any) => {
+                if (typeof s === 'boolean') return s === false;
+                if (typeof s === 'string') {
+                    const v = s.toLowerCase();
+                    // treat unknown strings (including 'pending') as pending, except explicit approved/published/rejected
+                    return !['published', 'approved', 'rejected'].includes(v);
+                }
+                return true; // null/undefined -> treat as pending
+            };
+            setEvents(rows.filter(r => isPending((r as any).status)));
         }
         setLoading(false);
     };

@@ -8,15 +8,15 @@
         </tr>
         <tr>
             <td>Meeting Date</td>
-            <td>October 31, 2025</td>
+            <td>October 30, 2025</td>
         </tr>
         <tr>
             <td>Meeting Time</td>
-            <td>17:30 – 18:40 (1h10)</td>
+            <td>18:30 – 19:40 (1h10)</td>
         </tr>
         <tr>
             <td>Meeting Format</td>
-            <td>Online (Discord)</td>
+            <td>In person</td>
         </tr>
       </table>
     </td>
@@ -31,7 +31,7 @@
         </tr>
         <tr>
           <td>Present</td>
-          <td>Ranjit, Aariz, Widjane, Kevin, Arnav, Hotplate5, Saad, Gunkeet</td>
+          <td>Ranjit, Widjane, Kevin, Arnav, Lorne, Saad, Gunkeet</td>
         </tr>
         <tr>
           <td>Absent</td>
@@ -93,7 +93,7 @@
   </tr>
   <tr>
     <td>Refine UI for tickets and dashboards</td>
-    <td>Aariz, Widjane</td>
+    <td>Widjane</td>
     <td>Ongoing</td>
   </tr>
   <tr>
@@ -103,7 +103,7 @@
   </tr>
   <tr>
     <td>Validate Supabase schema and push migration scripts</td>
-    <td>Arnav & Hotplate5</td>
+    <td>Arnav & Lorne</td>
     <td>Ongoing</td>
   </tr>
   <tr>
@@ -113,7 +113,8 @@
   </tr>
   <tr>
     <td>Implement UI polish and frontend enhancements</td>
-    <td>Widjane & Aariz</td>
+    <td>Widjane</td>
     <td>Planned</td>
   </tr>
 </table>
+

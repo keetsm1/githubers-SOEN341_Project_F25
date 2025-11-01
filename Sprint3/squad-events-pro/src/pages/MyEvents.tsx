@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Calendar, Ticket, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import Navigation from '@/components/layout/Navigation';
+import EventCard from '@/components/events/EventCard';
 import StarredEvents from './StarredEvents';
 import { useAuth } from '@/contexts/AuthContext';
 import { db, Event, Ticket as TicketType } from '@/services/database';
@@ -127,23 +128,86 @@ const MyEvents = () => {
                                 : "Manage your organization's events"}
                         </p>
                     </div>
-                    
+                    {user.role !== 'student' && (
+                        <Button
+                            onClick={() => navigate('/create-event')}
+                            className="bg-gradient-to-r from-primary to-primary/90"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Event
+                        </Button>
+                    )}
                 </div>
 
-                {user.role === 'student' ? (
-                    <Tabs defaultValue="tickets" className="space-y-6">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="tickets" className="flex items-center gap-2">
-                                <Ticket className="w-4 h-4" />
-                                My Tickets ({myTickets.length})
-                            </TabsTrigger>
-                            <TabsTrigger value="starred" className="flex items-center gap-2">
-                                <Star className="w-4 h-4" />
-                                Starred Events ({starredCount})
-                            </TabsTrigger>
-                        </TabsList>
+                <Tabs defaultValue="created" className="space-y-6">
+                    <TabsList className={`grid w-full ${user.role === 'student' ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                        <TabsTrigger value="created" className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            Created Events ({myEvents.length})
+                        </TabsTrigger>
+                        {user.role === 'student' && (
+                            <>
+                                <TabsTrigger value="tickets" className="flex items-center gap-2">
+                                    <Ticket className="w-4 h-4" />
+                                    My Tickets ({myTickets.length})
+                                </TabsTrigger>
+                                <TabsTrigger value="starred" className="flex items-center gap-2">
+                                    <Star className="w-4 h-4" />
+                                    Starred Events ({starredCount})
+                                </TabsTrigger>
+                            </>
+                        )}
+                    </TabsList>
 
-                        <TabsContent value="tickets">
+                    <TabsContent value="created">
+                        {loading ? (
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {[...Array(3)].map((_, i) => (
+                                    <Card key={i} className="animate-pulse">
+                                        <div className="aspect-video bg-muted" />
+                                        <CardContent className="p-6">
+                                            <div className="h-4 bg-muted rounded mb-2" />
+                                            <div className="h-6 bg-muted rounded mb-4" />
+                                            <div className="space-y-2">
+                                                <div className="h-3 bg-muted rounded" />
+                                                <div className="h-3 bg-muted rounded w-3/4" />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : myEvents.length === 0 ? (
+                            <Card>
+                                <CardContent className="p-12 text-center">
+                                    <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                                    <h3 className="text-xl font-semibold mb-2">No Events Created</h3>
+                                    <p className="text-muted-foreground mb-4">
+                                        You haven't created any events yet. Start by creating your first event!
+                                    </p>
+                                    <Button onClick={() => navigate('/create-event')}>
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Create Your First Event
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {myEvents.map((event) => (
+                                    <EventCard
+                                        key={(event as any).id ?? (event as any).event_id}
+                                        event={event}
+                                        onEdit={handleEditEvent}
+                                        onDelete={handleDeleteEvent}
+                                        showActions={true}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </TabsContent>
+
+                    {user.role === 'student' && (
+                        <>
+                            <TabsContent value="tickets">
                                 {loading ? (
                                     <div className="space-y-4">
                                         {[...Array(3)].map((_, i) => (
@@ -199,13 +263,14 @@ const MyEvents = () => {
                                         ))}
                                     </div>
                                 )}
-                        </TabsContent>
+                            </TabsContent>
 
-                        <TabsContent value="starred">
-                            <StarredEvents />
-                        </TabsContent>
-                    </Tabs>
-                ) : null}
+                            <TabsContent value="starred">
+                                <StarredEvents />
+                            </TabsContent>
+                        </>
+                    )}
+                </Tabs>
             </div>
 
             {/* QR Viewer Dialog */}

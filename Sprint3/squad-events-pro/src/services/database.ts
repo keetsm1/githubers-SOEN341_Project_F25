@@ -203,6 +203,13 @@ export interface Analytics {
     registrationTrend: { date: string; count: number }[];
 }
 
+// Points used by trend APIs (RSVPs vs Check-ins per day)
+export type TrendPoint = {
+    date: string;
+    rsvps: number;
+    checkins: number;
+};
+
 /** ──────────────────────────────────────────────────────────────────────────
  *  New: Filter types + helpers for event listing
  *  ────────────────────────────────────────────────────────────────────────── */
@@ -1684,7 +1691,11 @@ export const db = {
         const { data: ticketRow, error } = await query.maybeSingle();
         if (error) throw error;
         if (!ticketRow) return { ok: false, message: 'Ticket not found' };
-        if (ticketRow.events?.created_by !== organizerUserId) {
+        // Handle supabase join typing (object vs array)
+        const createdBy = Array.isArray((ticketRow as any).events)
+            ? (ticketRow as any).events[0]?.created_by
+            : (ticketRow as any).events?.created_by;
+        if (createdBy !== organizerUserId) {
             return { ok: false, message: 'You are not the organizer for this event' };
         }
         if (ticketRow.is_checked_in) {

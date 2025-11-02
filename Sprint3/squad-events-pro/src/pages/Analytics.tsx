@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+// removed Badge usage; numbering will be shown instead
 import {
   BarChart3,
   TrendingUp,
+  TrendingDown,
   Users,
   Calendar,
   Target,
@@ -18,7 +19,7 @@ import { Button } from '@/components/ui/button';
 const Analytics = () => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsType | null>(null);
-  const [myEvents, setMyEvents] = useState<Event[]>([]);
+  const [myEvents, setMyEvents] = useState<(Event & { attendanceRate?: number; attendanceChange?: number; isTop?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,7 +37,58 @@ const Analytics = () => {
       const approvedEvents = eventsResponse.data.filter(event =>
         event.isApproved && event.statusText === 'approved'
       );
-      setMyEvents(approvedEvents);
+      // Enrich events with attendance rate (for display) and compute rankings + trends
+      const eventsWithAttendance = approvedEvents.map((e) => ({
+        ...e,
+        attendanceRate: e.maxCapacity ? Math.round((e.currentAttendees / e.maxCapacity) * 100) : 0,
+      }));
+
+      // Sort by absolute number of attendees (desc) to determine top events
+      const sortedByAttendance = [...eventsWithAttendance].sort((a, b) => (b.currentAttendees || 0) - (a.currentAttendees || 0));
+
+      // For trend comparison, sort by creation time ascending (older -> newer).
+      // Prefer creation date (createdAt / created_at), fall back to startDate or date if creation date missing.
+      const getTime = (ev: any) => {
+        const d = ev.createdAt || ev.created_at || ev.startDate || ev.date || null;
+        const t = d ? new Date(d).getTime() : 0;
+        return Number.isFinite(t) ? t : 0;
+      };
+
+      const sortedByDateAsc = [...eventsWithAttendance].sort((a, b) => getTime(a) - getTime(b));
+
+      // Build a map of previous event attendee count (chronological)
+      const prevMap: Record<string, number | null> = {};
+      for (let i = 0; i < sortedByDateAsc.length; i++) {
+        const ev = sortedByDateAsc[i] as any;
+        const prev = i > 0 ? (sortedByDateAsc[i - 1] as any).currentAttendees : null;
+        prevMap[ev.id] = prev;
+      }
+
+      // Compose final enriched list: mark top 5 and compute percentage change in attendance
+      const enriched = sortedByAttendance.map((ev, idx) => {
+        const prev = prevMap[ev.id] ?? null;
+        let change: number | undefined;
+        if (prev === null || prev === undefined) {
+          change = undefined;
+        } else if (prev === 0) {
+          // If previous event had 0 attendees, show percentage increase from 0 as undefined
+          // to avoid divide by zero
+          change = undefined;
+        } else {
+          // Percentage change in attendees compared to previous event chronologically
+          change = Math.round(((ev.currentAttendees || 0) - prev) / prev * 100);
+        }
+
+        return {
+          ...ev,
+          attendanceRate: ev.attendanceRate || 0,
+          attendanceChange: change,
+          isTop: idx < 5,
+        };
+      });
+
+      // Keep myEvents ordered by attendance desc so top events show first
+      setMyEvents(enriched as any);
 
       // Load aggregated analytics for the organizer (sum across all events)
       try {
@@ -165,20 +217,41 @@ const Analytics = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {myEvents.slice(0, 5).map((event) => (
+                    {myEvents.slice(0, 5).map((event, idx) => (
                       <div key={event.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{event.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {event.currentAttendees} / {event.maxCapacity} attendees
-                          </p>
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold mr-4">
+                            {idx + 1}
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{event.title}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {event.currentAttendees} / {event.maxCapacity} attendees — {event.attendanceRate ?? 0}%
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <Badge
-                            variant={event.currentAttendees >= event.maxCapacity * 0.8 ? 'default' : 'secondary'}
-                          >
-                            {Math.round((event.currentAttendees / event.maxCapacity) * 100)}% Full
-                          </Badge>
+
+                        <div className="text-right flex items-center space-x-2">
+                          {/* Trend indicator compared to previous chronological event */}
+                          {typeof event.attendanceChange === 'number' ? (
+                            <div className="flex items-center text-xs font-medium">
+                              {event.attendanceChange > 0 ? (
+                                <span className="text-green-600 flex items-center">
+                                  <TrendingUp className="w-4 h-4 mr-1" />
+                                  +{event.attendanceChange}%
+                                </span>
+                              ) : event.attendanceChange < 0 ? (
+                                <span className="text-red-600 flex items-center">
+                                  <TrendingDown className="w-4 h-4 mr-1" />
+                                  {event.attendanceChange}%
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">No change</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </div>
                       </div>
                     ))}

@@ -10,9 +10,18 @@ import {
   Target,
   Download
 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from 'recharts';
 import Navigation from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { db, Analytics as AnalyticsType, Event } from '@/services/database';
+import { db, supabase, Analytics as AnalyticsType, Event } from '@/services/database';
 import LoginForm from '@/components/auth/LoginForm';
 import { Button } from '@/components/ui/button';
 
@@ -21,6 +30,9 @@ const Analytics = () => {
   const [analytics, setAnalytics] = useState<AnalyticsType | null>(null);
   const [myEvents, setMyEvents] = useState<(Event & { attendanceRate?: number; attendanceChange?: number; isTop?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [registrationTrend, setRegistrationTrend] = useState<{ date: string; registrations: number; eventId?: string; eventTitle?: string }[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
   useEffect(() => {
     if (user?.role === 'company') {
@@ -37,6 +49,46 @@ const Analytics = () => {
       const approvedEvents = eventsResponse.data.filter(event =>
         event.isApproved && event.statusText === 'approved'
       );
+
+      // Registration trend data (aggregate by day)
+      // Fetch registrations from DB and aggregate by registration created_at (per day)
+      const eventIds = approvedEvents.map(e => e.id);
+      if (eventIds.length === 0) {
+        setRegistrationTrend([]);
+      } else {
+        try {
+          const { data: regs, error: regErr } = await supabase
+            .from('registrations')
+            .select('registration_id,event_id,created_at')
+            .in('event_id', eventIds);
+
+          if (regErr) throw regErr;
+
+          const registrationsByDay: Record<string, { date: string; registrations: number; eventId: string; eventTitle: string }> = {};
+          const titleMap: Record<string, string> = {};
+          approvedEvents.forEach(ev => { titleMap[ev.id] = ev.title; });
+
+          (regs ?? []).forEach((r: any) => {
+            const d = r.created_at || r.createdAt || r.createdAt;
+            if (!d) return;
+            const day = new Date(d).toISOString().slice(0, 10);
+            const key = `${day}_${r.event_id}`;
+            registrationsByDay[key] = registrationsByDay[key] || {
+              date: day,
+              registrations: 0,
+              eventId: r.event_id,
+              eventTitle: titleMap[r.event_id] || '',
+            };
+            registrationsByDay[key].registrations += 1;
+          });
+
+          const trendArr = Object.values(registrationsByDay).sort((a, b) => a.date.localeCompare(b.date));
+          setRegistrationTrend(trendArr);
+        } catch (err) {
+          console.error('Error fetching registrations for trend:', err);
+          setRegistrationTrend([]);
+        }
+      }
       // Enrich events with attendance rate (for display) and compute rankings + trends
       const eventsWithAttendance = approvedEvents.map((e) => ({
         ...e,
@@ -130,11 +182,74 @@ const Analytics = () => {
     );
   }
 
+  // Filtered registration trend
+  let filteredTrend = registrationTrend;
+  if (selectedEventId !== 'all') {
+    filteredTrend = registrationTrend.filter((item) => {
+      // Event filter
+      if (selectedEventId !== 'all' && item.eventId !== selectedEventId) return false;
+      // Date range filter
+      if (dateRange.start && item.date < dateRange.start) return false;
+      if (dateRange.end && item.date > dateRange.end) return false;
+      return true;
+    });
+  } else {
+    // Combine all events together by day when 'All Events' is selected
+    const dayMap: Record<string, { date: string; registrations: number }> = {};
+    registrationTrend.forEach((item) => {
+      // apply date range filter first
+      if (dateRange.start && item.date < dateRange.start) return;
+      if (dateRange.end && item.date > dateRange.end) return;
+      const day = item.date;
+      if (!dayMap[day]) dayMap[day] = { date: day, registrations: 0 };
+      dayMap[day].registrations += item.registrations;
+    });
+    filteredTrend = Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // Filtered metrics (example: total registrations)
+  const filteredTotalRegistrations = filteredTrend.reduce((sum, item) => sum + item.registrations, 0);
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <Navigation />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Filters */}
+        <div className="flex flex-wrap gap-4 mb-6 items-end">
+          <div>
+            <label className="block text-sm font-medium mb-1">Event</label>
+            <select
+              className="border rounded px-2 py-1 min-w-[180px]"
+              value={selectedEventId}
+              onChange={e => setSelectedEventId(e.target.value)}
+            >
+              <option value="all">All Events</option>
+              {myEvents.map(ev => (
+                <option key={ev.id} value={ev.id}>{ev.title}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Start Date</label>
+            <input
+              type="date"
+              className="border rounded px-2 py-1"
+              value={dateRange.start}
+              onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">End Date</label>
+            <input
+              type="date"
+              className="border rounded px-2 py-1"
+              value={dateRange.end}
+              onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))}
+            />
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Analytics Dashboard</h1>
@@ -142,6 +257,10 @@ const Analytics = () => {
               Track your events performance and engagement
             </p>
           </div>
+          <Button variant="outline">
+            <Download className="w-4 h-4 mr-2" />
+            Export Report
+          </Button>
         </div>
 
         {loading ? (
@@ -165,7 +284,7 @@ const Analytics = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Events</p>
-                      <p className="text-3xl font-bold text-primary">{myEvents.length}</p>
+                      <p className="text-3xl font-bold text-primary">{selectedEventId === 'all' ? myEvents.length : 1}</p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
                         +12% from last month
@@ -181,7 +300,7 @@ const Analytics = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Registrations</p>
-                      <p className="text-3xl font-bold text-accent">{analytics?.totalRegistrations}</p>
+                      <p className="text-3xl font-bold text-accent">{filteredTotalRegistrations}</p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
                         +8% from last week
@@ -246,11 +365,11 @@ const Analytics = () => {
                                   {event.attendanceChange}%
                                 </span>
                               ) : (
-                                <span className="text-muted-foreground">No change</span>
+                                <span className="text-muted-foreground">———</span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">———</span>
                           )}
                         </div>
                       </div>
@@ -265,30 +384,23 @@ const Analytics = () => {
                   <CardTitle>Registration Trends</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">This Week</span>
-                      <span className="font-semibold">32 registrations</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-primary h-2 rounded-full" style={{ width: '85%' }} />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Last Week</span>
-                      <span className="font-semibold">28 registrations</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-accent h-2 rounded-full" style={{ width: '70%' }} />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Month Average</span>
-                      <span className="font-semibold">25 registrations</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-muted-foreground h-2 rounded-full" style={{ width: '65%' }} />
-                    </div>
+                  <div style={{ width: '100%', height: 250 }}>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={filteredTrend} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{ background: '#fff', borderRadius: 8, fontSize: 14 }}
+                          labelStyle={{ fontWeight: 'bold' }}
+                          formatter={(value: any, name: any, props: any) => {
+                            const label = selectedEventId === 'all' ? 'All events' : (props?.payload?.eventTitle || 'Registrations');
+                            return [`${value} registrations`, label];
+                          }}
+                        />
+                        <Line type="monotone" dataKey="registrations" stroke="#6366f1" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 7 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>

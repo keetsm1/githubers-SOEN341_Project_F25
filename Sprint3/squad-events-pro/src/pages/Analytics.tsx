@@ -91,6 +91,58 @@ const Analytics = () => {
     }
   };
 
+  const exportReport = () => {
+    const organizerId = user?.id ?? 'unknown';
+    const organizerName =
+      // try common user fields for display
+      (user as any)?.full_name || (user as any)?.name || (user as any)?.org_name || user?.email || 'Organizer';
+    const totals = {
+      totalEvents: myEvents.length,
+      totalRegistrations: analytics?.totalRegistrations ?? 0,
+      checkedIn: analytics?.checkedIn ?? 0,
+      attendanceRate: analytics?.attendanceRate ?? 0,
+    };
+
+    const lines: string[] = [];
+    const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+    // Report title
+    lines.push(`Analytics Report - ${organizerName} (${organizerId})`);
+    lines.push('');
+
+    // Totals section
+    lines.push('Totals');
+    lines.push(['Total Events','Total RSVPs','Checked-in','Check-in Percentage'].map(esc).join(','));
+    lines.push([
+      totals.totalEvents,
+      totals.totalRegistrations,
+      totals.checkedIn,
+      `${totals.attendanceRate}%`,
+    ].map(esc).join(','));
+    lines.push('');
+
+    // Per-event section
+    lines.push('Per Event');
+    lines.push(['Event Title','Event ID','RSVPs','Capacity'].map(esc).join(','));
+    myEvents.forEach((e) => {
+      lines.push([
+        e.title,
+        (e as any).id ?? (e as any).event_id,
+        e.currentAttendees ?? 0,
+        e.maxCapacity ?? 0,
+      ].map(esc).join(','));
+    });
+
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-report-${organizerId}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!user) {
     return <LoginForm />;
   }
@@ -126,7 +178,7 @@ const Analytics = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={exportReport}>
               <Download className="w-4 h-4 mr-2" />
               Export Report
             </Button>

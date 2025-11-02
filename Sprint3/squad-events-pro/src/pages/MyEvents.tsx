@@ -16,6 +16,7 @@ import { Plus, Calendar, Ticket, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import Navigation from '@/components/layout/Navigation';
 import StarredEvents from './StarredEvents';
+import EventCard from '@/components/events/EventCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { db, Event, Ticket as TicketType } from '@/services/database';
 import { useNavigate } from 'react-router-dom';
@@ -205,7 +206,50 @@ const MyEvents = () => {
                             <StarredEvents />
                         </TabsContent>
                     </Tabs>
-                ) : null}
+                ) : (
+                    <div className="space-y-6">
+                        {loading ? (
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {[...Array(6)].map((_, i) => (
+                                    <Card key={i} className="animate-pulse">
+                                        <div className="aspect-video bg-muted" />
+                                        <CardContent className="p-6">
+                                            <div className="h-4 bg-muted rounded mb-2" />
+                                            <div className="h-6 bg-muted rounded mb-4" />
+                                            <div className="space-y-2">
+                                                <div className="h-3 bg-muted rounded" />
+                                                <div className="h-3 bg-muted rounded w-3/4" />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : myEvents.length === 0 ? (
+                            <Card>
+                                <CardContent className="p-12 text-center">
+                                    <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                                    <h3 className="text-xl font-semibold mb-2">No Events Created</h3>
+                                    <p className="text-muted-foreground mb-4">Create your first event to get started.</p>
+                                    <Button onClick={() => navigate('/create-event')}>
+                                        <Plus className="w-4 h-4 mr-2" /> Create Event
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {myEvents.map((ev: any) => (
+                                    <EventCard
+                                        key={ev.id ?? ev.event_id}
+                                        event={ev}
+                                        onEdit={handleEditEvent}
+                                        onDelete={handleDeleteEvent}
+                                        showActions={true}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* QR Viewer Dialog */}

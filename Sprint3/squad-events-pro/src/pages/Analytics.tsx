@@ -21,7 +21,7 @@ import {
 } from 'recharts';
 import Navigation from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { db, supabase, Analytics as AnalyticsType, Event } from '@/services/database';
+import { db, supabase, Analytics as AnalyticsType, Event, listEventCategories } from '@/services/database';
 import LoginForm from '@/components/auth/LoginForm';
 import { Button } from '@/components/ui/button';
 
@@ -32,11 +32,16 @@ const Analytics = () => {
   const [loading, setLoading] = useState(true);
   const [registrationTrend, setRegistrationTrend] = useState<{ date: string; registrations: number; eventId?: string; eventTitle?: string }[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('all');
-  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [eventDateRange, setEventDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [trendDateRange, setTrendDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
   useEffect(() => {
     if (user?.role === 'company') {
       loadAnalytics();
+      // Load categories from DB
+  listEventCategories().then(setCategories).catch(() => setCategories([]));
     }
   }, [user]);
 
@@ -184,13 +189,18 @@ const Analytics = () => {
 
   // Filtered registration trend
   let filteredTrend = registrationTrend;
-  if (selectedEventId !== 'all') {
+  if (selectedEventId !== 'all' || selectedCategory !== 'all') {
     filteredTrend = registrationTrend.filter((item) => {
       // Event filter
       if (selectedEventId !== 'all' && item.eventId !== selectedEventId) return false;
-      // Date range filter
-      if (dateRange.start && item.date < dateRange.start) return false;
-      if (dateRange.end && item.date > dateRange.end) return false;
+      // Category filter
+      if (selectedCategory !== 'all') {
+        const event = myEvents.find(ev => ev.id === item.eventId);
+        if (!event || event.category !== selectedCategory) return false;
+      }
+      // Date range filter for trends
+      if (trendDateRange.start && item.date < trendDateRange.start) return false;
+      if (trendDateRange.end && item.date > trendDateRange.end) return false;
       return true;
     });
   } else {
@@ -198,8 +208,8 @@ const Analytics = () => {
     const dayMap: Record<string, { date: string; registrations: number }> = {};
     registrationTrend.forEach((item) => {
       // apply date range filter first
-      if (dateRange.start && item.date < dateRange.start) return;
-      if (dateRange.end && item.date > dateRange.end) return;
+      if (trendDateRange.start && item.date < trendDateRange.start) return;
+      if (trendDateRange.end && item.date > trendDateRange.end) return;
       const day = item.date;
       if (!dayMap[day]) dayMap[day] = { date: day, registrations: 0 };
       dayMap[day].registrations += item.registrations;
@@ -215,7 +225,7 @@ const Analytics = () => {
       <Navigation />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Filters */}
+        {/* Global Filters */}
         <div className="flex flex-wrap gap-4 mb-6 items-end">
           <div>
             <label className="block text-sm font-medium mb-1">Event</label>
@@ -231,22 +241,17 @@ const Analytics = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Start Date</label>
-            <input
-              type="date"
-              className="border rounded px-2 py-1"
-              value={dateRange.start}
-              onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">End Date</label>
-            <input
-              type="date"
-              className="border rounded px-2 py-1"
-              value={dateRange.end}
-              onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))}
-            />
+            <label className="block text-sm font-medium mb-1">Category</label>
+            <select
+              className="border rounded px-2 py-1 min-w-[140px]"
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+            >
+              <option value="all">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -284,7 +289,11 @@ const Analytics = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Events</p>
-                      <p className="text-3xl font-bold text-primary">{selectedEventId === 'all' ? myEvents.length : 1}</p>
+                      <p className="text-3xl font-bold text-primary">
+                        {selectedEventId !== 'all' ? 1 : 
+                         selectedCategory !== 'all' ? myEvents.filter(e => e.category === selectedCategory).length : 
+                         myEvents.length}
+                      </p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
                         +12% from last month
@@ -331,12 +340,44 @@ const Analytics = () => {
             {/* Event Performance */}
             <div className="grid lg:grid-cols-2 gap-8 mb-8">
               <Card className="shadow-card">
-                <CardHeader>
+                <CardHeader className="flex flex-col space-y-4">
                   <CardTitle>Event Performance</CardTitle>
+                  <div className="flex gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        className="border rounded px-2 py-1"
+                        value={eventDateRange.start}
+                        onChange={e => setEventDateRange(r => ({ ...r, start: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">End Date</label>
+                      <input
+                        type="date"
+                        className="border rounded px-2 py-1"
+                        value={eventDateRange.end}
+                        onChange={e => setEventDateRange(r => ({ ...r, end: e.target.value }))}
+                      />
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {myEvents.slice(0, 5).map((event, idx) => (
+                    {myEvents
+                      .filter(event => {
+                        // Event filter
+                        if (selectedEventId !== 'all' && event.id !== selectedEventId) return false;
+                        // Category filter
+                        if (selectedCategory !== 'all' && event.category !== selectedCategory) return false;
+                        // Date filter - use event.date
+                        if (eventDateRange.start && event.date < eventDateRange.start) return false;
+                        if (eventDateRange.end && event.date > eventDateRange.end) return false;
+                        return true;
+                      })
+                      .slice(0, 5)
+                      .map((event, idx) => (
                       <div key={event.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                         <div className="flex items-center">
                           <div className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold mr-4">
@@ -380,8 +421,28 @@ const Analytics = () => {
 
               {/* Registration Trends */}
               <Card className="shadow-card">
-                <CardHeader>
+                <CardHeader className="flex flex-col space-y-4">
                   <CardTitle>Registration Trends</CardTitle>
+                  <div className="flex gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        className="border rounded px-2 py-1"
+                        value={trendDateRange.start}
+                        onChange={e => setTrendDateRange(r => ({ ...r, start: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">End Date</label>
+                      <input
+                        type="date"
+                        className="border rounded px-2 py-1"
+                        value={trendDateRange.end}
+                        onChange={e => setTrendDateRange(r => ({ ...r, end: e.target.value }))}
+                      />
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div style={{ width: '100%', height: 250 }}>

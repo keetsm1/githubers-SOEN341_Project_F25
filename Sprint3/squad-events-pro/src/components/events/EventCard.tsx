@@ -40,11 +40,13 @@ const EventCard: React.FC<EventCardProps> = ({
     const [isStarred, setIsStarred] = React.useState(false);
 
     const eventId = (event as any).id ?? (event as any).event_id;
+    const [liveCount, setLiveCount] = React.useState<number | null>(null);
     const eventDate = new Date(event.date);
     const isUpcoming = eventDate > new Date();
+    const displayAttendees = typeof liveCount === 'number' ? liveCount : event.currentAttendees;
     const capacityPercentage =
         event.maxCapacity > 0
-            ? Math.min((event.currentAttendees / event.maxCapacity) * 100, 100)
+            ? Math.min(((displayAttendees || 0) / event.maxCapacity) * 100, 100)
             : 0;
 
     // "Pending" detection supports both older flags and new status strings
@@ -74,6 +76,39 @@ const EventCard: React.FC<EventCardProps> = ({
             }
         };
         checkStarred();
+    }, [eventId]);
+
+    // Load live attendee count for each card
+    React.useEffect(() => {
+        let cancelled = false;
+        const loadCount = async () => {
+            try {
+                const mod = await import('@/services/database');
+                let count: number | null = null;
+                try {
+                    // Prefer helper if available
+                    // @ts-ignore
+                    if (mod.db && typeof mod.db.getEventTicketCount === 'function') {
+                        // @ts-ignore
+                        count = await mod.db.getEventTicketCount(eventId);
+                    }
+                } catch {}
+                if (count == null && mod.supabase && mod.isSupabaseEnabled) {
+                    try {
+                        const { data, count: c } = await mod.supabase
+                            .from('tickets')
+                            .select('ticket_id', { count: 'exact', head: true })
+                            .eq('event_id', eventId);
+                        count = typeof c === 'number' ? c : null;
+                    } catch {}
+                }
+                if (!cancelled && typeof count === 'number') setLiveCount(count);
+            } catch {
+                // ignore
+            }
+        };
+        loadCount();
+        return () => { cancelled = true; };
     }, [eventId]);
 
     const handleStarEvent = async () => {
@@ -152,7 +187,7 @@ const EventCard: React.FC<EventCardProps> = ({
                         <div className="flex items-center text-sm text-muted-foreground">
                             <Users className="w-4 h-4 mr-2 text-primary" />
                             <span>
-                {event.currentAttendees} / {event.maxCapacity} attending
+                {displayAttendees} / {event.maxCapacity} attending
               </span>
                         </div>
                         <div className="text-xs text-muted-foreground">

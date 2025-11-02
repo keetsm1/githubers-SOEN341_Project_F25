@@ -21,6 +21,7 @@ import OrgSignUp from "./components/auth/OrgSignUp";
 import EventDetails from "./pages/EventDetails";
 import ApproveEvents from "./pages/admin/ApproveEvents";
 import Scan from "./pages/Scan";
+import EventHistory from "./pages/EventHistory";
 
 // NEW: edit page route
 import EditEvent from "./pages/EditEvent";
@@ -61,6 +62,7 @@ const App = () => (
                         <Route path="/stats" element={<Stats />} />
                         <Route path="/scan/:id" element={<Scan />} />
                         <Route path="/events/:id" element={<EventDetails />} />
+                        <Route path="/events/:id/history" element={<EventHistory />} />
 
                         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                         <Route path="*" element={<NotFound />} />

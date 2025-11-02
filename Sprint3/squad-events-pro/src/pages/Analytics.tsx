@@ -16,7 +16,7 @@ import { supabase, isSupabaseEnabled } from '@/lib/supabase';
 import LoginForm from '@/components/auth/LoginForm';
 import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
-import { LineChart, CartesianGrid, XAxis, YAxis, Line, Tooltip, Legend } from 'recharts';
+import { BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar } from 'recharts';
 
 const Analytics = () => {
   const { user } = useAuth();
@@ -57,16 +57,28 @@ const Analytics = () => {
       const t = await db.getOrganizerTrends(user.id);
       setTrend(t);
 
-      // Recent activity: latest ticket creations across organizer's events
+      // Recent activity: latest ticket creations across organizer's events with attendee names
       if (isSupabaseEnabled && supabase && events.length > 0) {
-        const { data } = await supabase
+        const { data: tix } = await supabase
           .from('tickets')
-          .select('created_at, event_id, events!inner(title)')
+          .select('created_at, event_id, user_id, events!inner(title)')
           .in('event_id', events.map((e) => e.id))
           .order('created_at', { ascending: false })
-          .limit(5);
-        const mapped = (data ?? []).map((row: any) => ({
-          action: 'New registration',
+          .limit(10);
+        const tickets = (tix ?? []) as any[];
+        const userIds = Array.from(new Set(tickets.map(t => String(t.user_id)).filter(Boolean)));
+        let nameMap = new Map<string, string | null>();
+        if (userIds.length > 0) {
+          try {
+            const { data: profs } = await supabase
+              .from('profiles')
+              .select('user_id, full_name')
+              .in('user_id', userIds as any);
+            nameMap = new Map((profs ?? []).map((p: any) => [String(p.user_id), p.full_name ?? null]));
+          } catch {}
+        }
+        const mapped = tickets.map((row: any) => ({
+          action: nameMap.get(String(row.user_id)) ? `${nameMap.get(String(row.user_id))} RSVP` : 'New registration',
           event: row.events?.title ?? 'Event',
           time: new Date(row.created_at).toLocaleString(),
         }));
@@ -250,18 +262,15 @@ const Analytics = () => {
                     }}
                     className="w-full h-[280px]"
                   >
-                    <LineChart data={trend} margin={{ left: 12, right: 12 }}>
+                    <BarChart data={trend} margin={{ left: 12, right: 12 }}>
                       <CartesianGrid vertical={false} strokeDasharray="3 3" />
                       <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
                       <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={30} />
                       <Tooltip content={<ChartTooltipContent />} />
                       <Legend content={<ChartLegendContent />} />
-                      {series === 'rsvps' ? (
-                        <Line type="monotone" dataKey="rsvps" stroke="var(--color-rsvps)" dot={false} strokeWidth={2} />
-                      ) : (
-                        <Line type="monotone" dataKey="checkins" stroke="var(--color-checkins)" dot={false} strokeWidth={2} />
-                      )}
-                    </LineChart>
+                      <Bar dataKey="rsvps" fill="var(--color-rsvps)" radius={[4,4,0,0]} />
+                      <Bar dataKey="checkins" fill="var(--color-checkins)" radius={[4,4,0,0]} />
+                    </BarChart>
                   </ChartContainer>
                 </CardContent>
               </Card>

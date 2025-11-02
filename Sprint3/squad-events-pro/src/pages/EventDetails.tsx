@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Navigation from '@/components/layout/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from '@/components/auth/LoginForm';
-import { db } from '@/services/database';
+import { db, supabase, isSupabaseEnabled } from '@/services/database';
 import { Calendar, MapPin, Users, ArrowLeft, BarChart3, Target, ScanQrCode } from 'lucide-react';
 import { ChartContainer, ChartTooltipContent, ChartLegendContent } from '@/components/ui/chart';
-import { LineChart, CartesianGrid, XAxis, YAxis, Line, Tooltip, Legend } from 'recharts';
+import { BarChart, CartesianGrid, XAxis, YAxis, Bar, Tooltip, Legend } from 'recharts';
 import { format } from 'date-fns';
 
 const EventDetails: React.FC = () => {
@@ -22,6 +22,9 @@ const EventDetails: React.FC = () => {
   const [isRSVPing, setIsRSVPing] = useState(false);
   const [eventAnalytics, setEventAnalytics] = useState<import('@/services/database').Analytics | null>(null);
   const [trend, setTrend] = useState<{ date: string; rsvps: number; checkins: number }[]>([]);
+  const [recent, setRecent] = useState<Array<{ kind: 'RSVP' | 'Check-in'; time: string; name?: string | null }>>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [recentError, setRecentError] = useState<string | null>(null);
 
   const eventId = useMemo(() => id as string, [id]);
 
@@ -70,6 +73,105 @@ const EventDetails: React.FC = () => {
     load();
   }, [eventId, user]);
 
+  // Load live attendee count for this event
+  useEffect(() => {
+    const loadCount = async () => {
+      if (!event) return;
+      try {
+        const mod = await import('@/services/database');
+        let count: number | null = null;
+        try {
+          // @ts-ignore prefer helper if present
+          if (mod.db && typeof mod.db.getEventTicketCount === 'function') {
+            // @ts-ignore
+            count = await mod.db.getEventTicketCount(event.id);
+          }
+        } catch {}
+        if (count == null && mod.supabase && mod.isSupabaseEnabled) {
+          try {
+            const { count: c } = await mod.supabase
+              .from('tickets')
+              .select('ticket_id', { count: 'exact', head: true })
+              .eq('event_id', event.id);
+            count = typeof c === 'number' ? c : null;
+          } catch {}
+        }
+        if (typeof count === 'number') {
+          setEvent((prev: any) => (prev ? { ...prev, currentAttendees: count } : prev));
+        }
+      } catch {}
+    };
+    loadCount();
+  }, [event?.id]);
+
+  // Recent Activity (names fetched from profiles by user_id)
+  useEffect(() => {
+    const loadRecent = async () => {
+      if (!eventId) return;
+      if (!isSupabaseEnabled || !supabase) {
+        setRecent([]);
+        return;
+      }
+      setRecentLoading(true);
+      setRecentError(null);
+      try {
+        // Fetch latest registrations and tickets separately
+        const [{ data: rsvps }, { data: tix }] = await Promise.all([
+          supabase
+            .from('registrations')
+            .select('registration_id, user_id, created_at')
+            .eq('event_id', eventId)
+            .order('created_at', { ascending: false })
+            .limit(30),
+          supabase
+            .from('tickets')
+            .select('ticket_id, user_id, is_checked_in, checked_in_at, created_at')
+            .eq('event_id', eventId)
+            .order('created_at', { ascending: false })
+            .limit(30),
+        ]);
+
+        const regs = (rsvps as any[]) ?? [];
+        const tickets = ((tix as any[]) ?? []).filter(t => t.is_checked_in);
+
+        const userIds = Array.from(new Set([
+          ...regs.map(r => String(r.user_id)),
+          ...tickets.map(t => String(t.user_id)),
+        ].filter(Boolean)));
+
+        const nameMap = new Map<string, { full_name?: string | null }>();
+        if (userIds.length > 0) {
+          const { data: profs } = await supabase
+            .from('profiles')
+            .select('user_id, full_name')
+            .in('user_id', userIds as any);
+          (profs ?? []).forEach((p: any) => nameMap.set(String(p.user_id), { full_name: p.full_name }));
+        }
+
+        const rItems = regs.map(r => ({
+          kind: 'RSVP' as const,
+          time: r.created_at as string,
+          name: nameMap.get(String(r.user_id))?.full_name ?? null,
+        }));
+        const cItems = tickets.map(t => ({
+          kind: 'Check-in' as const,
+          time: (t.checked_in_at ?? t.created_at) as string,
+          name: nameMap.get(String(t.user_id))?.full_name ?? null,
+        }));
+
+        const merged = [...rItems, ...cItems]
+          .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+          .slice(0, 20);
+        setRecent(merged);
+      } catch (e) {
+        setRecentError('Failed to load recent activity');
+      } finally {
+        setRecentLoading(false);
+      }
+    };
+    loadRecent();
+  }, [eventId]);
+
   const handleRSVP = async () => {
     if (!user || !event) return;
     setIsRSVPing(true);
@@ -90,7 +192,10 @@ const EventDetails: React.FC = () => {
       <Navigation />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate(-1)}>
+          <Button
+            variant="outline"
+            onClick={() => navigate(user && (user.role === 'company' || user.role === 'admin') ? '/my-events' : '/search')}
+          >
             <ArrowLeft className="w-4 h-4 mr-2" /> Back
           </Button>
         </div>
@@ -155,9 +260,11 @@ const EventDetails: React.FC = () => {
                   </Button>
                 )}
                 {user && (user.role === 'company' || user.role === 'admin') && event.organizerId === user.id && (
-                  <Button variant="outline" onClick={() => navigate(`/scan/${event.id}`)}>
-                    <ScanQrCode className="w-4 h-4 mr-2" /> Scan Tickets
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => navigate(`/scan/${event.id}`)}>
+                      <ScanQrCode className="w-4 h-4 mr-2" /> Scan Tickets
+                    </Button>
+                  </div>
                 )}
               </div>
             </CardHeader>
@@ -170,6 +277,38 @@ const EventDetails: React.FC = () => {
                 </section>
               )}
 
+              {/* Recent Activity with Full History shortcut (rendered beneath analytics) */}
+              {user && (user.role === 'company' || user.role === 'admin') && user.id === event.organizerId && (
+                <section>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold">Recent Activity</h3>
+                    <Button variant="secondary" asChild>
+                      <Link to={`/events/${event.id}/history`}>Full History</Link>
+                    </Button>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {recentLoading ? (
+                      <div>Loading…</div>
+                    ) : recentError ? (
+                      <div className="text-destructive">{recentError}</div>
+                    ) : recent.length === 0 ? (
+                      <div>No activity yet.</div>
+                    ) : (
+                      recent.map((it, idx) => (
+                        <div key={idx} className="flex items-center justify-between border-b last:border-0 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className={it.kind === 'Check-in' ? 'text-green-700' : 'text-primary'}>{it.kind}</span>
+                            <span className="text-muted-foreground">{it.name ?? 'New attendee'}</span>
+                          </div>
+                          <div className="text-muted-foreground">{new Date(it.time).toLocaleString()}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+              )}
+              
+
               {event.tags && event.tags.length > 0 && (
                 <section>
                   <h3 className="font-semibold mb-2">Tags</h3>
@@ -180,6 +319,8 @@ const EventDetails: React.FC = () => {
                   </div>
                 </section>
               )}
+
+              
 
               {user && (user.role === 'company' || user.role === 'admin') && user.id === event.organizerId && (
                 <section>
@@ -192,7 +333,7 @@ const EventDetails: React.FC = () => {
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-xs text-muted-foreground">Registrations</p>
+                              <p className="text-xs text-muted-foreground">RSVPs</p>
                               <p className="text-2xl font-bold">{eventAnalytics.totalRegistrations}</p>
                             </div>
                             <Users className="w-6 h-6 text-accent" />
@@ -214,7 +355,7 @@ const EventDetails: React.FC = () => {
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-xs text-muted-foreground">Attendance Rate</p>
+                              <p className="text-xs text-muted-foreground">Check-in Percentage</p>
                               <p className="text-2xl font-bold">{eventAnalytics.attendanceRate}%</p>
                             </div>
                             <Target className="w-6 h-6 text-primary" />
@@ -236,15 +377,15 @@ const EventDetails: React.FC = () => {
                           }}
                           className="w-full h-[240px]"
                         >
-                          <LineChart data={trend} margin={{ left: 12, right: 12 }}>
+                          <BarChart data={trend} margin={{ left: 12, right: 12 }}>
                             <CartesianGrid vertical={false} strokeDasharray="3 3" />
                             <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
                             <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={30} />
                             <Tooltip content={<ChartTooltipContent />} />
                             <Legend content={<ChartLegendContent />} />
-                            <Line type="monotone" dataKey="rsvps" stroke="var(--color-rsvps)" dot={false} strokeWidth={2} />
-                            <Line type="monotone" dataKey="checkins" stroke="var(--color-checkins)" dot={false} strokeWidth={2} />
-                          </LineChart>
+                            <Bar dataKey="rsvps" fill="var(--color-rsvps)" radius={[4,4,0,0]} />
+                            <Bar dataKey="checkins" fill="var(--color-checkins)" radius={[4,4,0,0]} />
+                          </BarChart>
                         </ChartContainer>
                       </CardContent>
                     </Card>

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Users, 
+import {
+  BarChart3,
+  TrendingUp,
+  Users,
   Calendar,
   Target,
   Download
@@ -29,16 +29,25 @@ const Analytics = () => {
 
   const loadAnalytics = async () => {
     if (!user) return;
-    
-    try {
-      // Load company's events
-      const eventsResponse = await db.getEvents({ organizerId: user.id });
-      setMyEvents(eventsResponse.data);
 
-      // Load analytics for first event (in real app, would aggregate all events)
-      if (eventsResponse.data.length > 0) {
-        const eventAnalytics = await db.getEventStats(eventsResponse.data[0].id);
-        setAnalytics(eventAnalytics);
+    try {
+      // Load company's approved events only
+      const eventsResponse = await db.getEvents({ organizerId: user.id });
+      const approvedEvents = eventsResponse.data.filter(event =>
+        event.isApproved && event.statusText === 'approved'
+      );
+      setMyEvents(approvedEvents);
+
+      // Load aggregated analytics for the organizer (sum across all events)
+      try {
+        const orgAnalytics = await db.getOrganizerStats(user.id);
+        setAnalytics(orgAnalytics);
+      } catch (err) {
+        // Fallback: if organizer-level stats fail, try per-event stats for the first event
+        if (approvedEvents.length > 0) {
+          const eventAnalytics = await db.getEventStats(approvedEvents[0].id);
+          setAnalytics(eventAnalytics);
+        }
       }
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -72,7 +81,7 @@ const Analytics = () => {
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <Navigation />
-      
+
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -81,15 +90,11 @@ const Analytics = () => {
               Track your events performance and engagement
             </p>
           </div>
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export Report
-          </Button>
         </div>
 
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {[...Array(3)].map((_, i) => (
               <Card key={i} className="animate-pulse">
                 <CardContent className="p-6">
                   <div className="h-4 bg-muted rounded mb-2" />
@@ -102,7 +107,7 @@ const Analytics = () => {
         ) : (
           <>
             {/* Key Metrics */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               <Card className="shadow-card hover:shadow-elevated transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -124,7 +129,7 @@ const Analytics = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Registrations</p>
-                      <p className="text-3xl font-bold text-accent">{analytics?.totalRegistrations || 0}</p>
+                      <p className="text-3xl font-bold text-accent">{analytics?.totalRegistrations}</p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
                         +8% from last week
@@ -150,22 +155,6 @@ const Analytics = () => {
                   </div>
                 </CardContent>
               </Card>
-
-              <Card className="shadow-card hover:shadow-elevated transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Revenue Impact</p>
-                      <p className="text-3xl font-bold text-accent">$2.4K</p>
-                      <p className="text-xs text-green-600 flex items-center mt-1">
-                        <TrendingUp className="w-3 h-3 mr-1" />
-                        +15% growth
-                      </p>
-                    </div>
-                    <BarChart3 className="w-8 h-8 text-accent opacity-80" />
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Event Performance */}
@@ -185,7 +174,7 @@ const Analytics = () => {
                           </p>
                         </div>
                         <div className="text-right">
-                          <Badge 
+                          <Badge
                             variant={event.currentAttendees >= event.maxCapacity * 0.8 ? 'default' : 'secondary'}
                           >
                             {Math.round((event.currentAttendees / event.maxCapacity) * 100)}% Full
@@ -211,7 +200,7 @@ const Analytics = () => {
                     <div className="w-full bg-muted rounded-full h-2">
                       <div className="bg-primary h-2 rounded-full" style={{ width: '85%' }} />
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Last Week</span>
                       <span className="font-semibold">28 registrations</span>
@@ -219,7 +208,7 @@ const Analytics = () => {
                     <div className="w-full bg-muted rounded-full h-2">
                       <div className="bg-accent h-2 rounded-full" style={{ width: '70%' }} />
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Month Average</span>
                       <span className="font-semibold">25 registrations</span>
@@ -246,9 +235,8 @@ const Analytics = () => {
                     { action: 'New registration', event: 'Study Session', time: '5 hours ago', type: 'positive' },
                   ].map((activity, index) => (
                     <div key={index} className="flex items-center space-x-4 p-3 border-l-4 border-l-primary bg-muted/20 rounded-r-lg">
-                      <div className={`w-2 h-2 rounded-full ${
-                        activity.type === 'positive' ? 'bg-green-500' : 'bg-blue-500'
-                      }`} />
+                      <div className={`w-2 h-2 rounded-full ${activity.type === 'positive' ? 'bg-green-500' : 'bg-blue-500'
+                        }`} />
                       <div className="flex-1">
                         <p className="text-sm font-medium">{activity.action}</p>
                         <p className="text-xs text-muted-foreground">{activity.event}</p>

@@ -724,6 +724,31 @@ export const db = {
 
         if (error) throw error;
 
+        // Try to fetch aggregated registration counts from event_counters in one batch.
+        let regCountMap: Record<string, number> = {};
+        try {
+            if (isSupabaseEnabled && supabase) {
+                const ids = (data ?? []).map((ev: any) => ev.event_id ?? ev.id).filter(Boolean);
+                if (ids.length > 0) {
+                    const { data: counters, error: countersErr } = await supabase
+                        .from('event_counters')
+                        .select('event_id, reg_count')
+                        .in('event_id', ids as string[]);
+                    if (!countersErr && counters) {
+                        (counters as any[]).forEach((c) => {
+                            if (c && (c.event_id ?? c.eventId)) {
+                                const eid = c.event_id ?? c.eventId;
+                                regCountMap[eid] = Number(c.reg_count ?? 0);
+                            }
+                        });
+                    }
+                }
+            }
+        } catch {
+            // ignore and fallback to zeros
+            regCountMap = {};
+        }
+
         const mapped = (data ?? []).map((ev: any) => {
             const raw = ev.status;
             let isApproved: boolean;
@@ -758,7 +783,8 @@ export const db = {
                 organizerId: ev.created_by,
                 organizerName: ev.org_name ?? 'You',
                 maxCapacity: ev.max_cap ?? 0,
-                currentAttendees: 0,
+                // Prefer aggregated counter when available (event_counters.reg_count)
+                currentAttendees: regCountMap[(ev as any).event_id ?? (ev as any).id] ?? 0,
                 imageUrl: ev.image_url ?? undefined,
                 tags: [],
                 isApproved,
@@ -1345,17 +1371,118 @@ export const db = {
     },
 
     async getEventStats(eventId: string): Promise<Analytics> {
+        // Prefer aggregated counter in event_counters.reg_count for fast totals
+        let totalRegistrations = 0;
+        try {
+            if (isSupabaseEnabled && supabase) {
+                const { data: ec, error: ecErr } = await supabase
+                    .from('event_counters')
+                    .select('reg_count')
+                    .eq('event_id', eventId)
+                    .maybeSingle();
+                if (!ecErr && ec && typeof (ec as any).reg_count === 'number') {
+                    totalRegistrations = Number((ec as any).reg_count ?? 0);
+                } else {
+                    // Fallback to counting registrations table if counters missing
+                    const { count } = await supabase
+                        .from('registrations')
+                        .select('registration_id', { head: true, count: 'exact' })
+                        .eq('event_id', eventId);
+                    totalRegistrations = Number(count ?? 0);
+                }
+            } else {
+                // Local/mock mode fallback
+                totalRegistrations = await db.getEventTicketCount(eventId);
+            }
+        } catch {
+            totalRegistrations = 0;
+        }
+
         return {
-            totalRegistrations: 32,
-            ticketsSold: 35,
-            checkedIn: 28,
-            attendanceRate: 80,
+            totalRegistrations,
+            // For now, approximate ticketsSold with totalRegistrations when no separate sales table exists
+            ticketsSold: totalRegistrations,
+            checkedIn: 0,
+            attendanceRate: 0,
             eventsByCategory: {},
-            registrationTrend: [
-                { date: '2024-09-20', count: 5 },
-                { date: '2024-09-21', count: 12 },
-                { date: '2024-09-22', count: 15 },
-            ],
+            registrationTrend: [],
+        };
+    },
+    /**
+     * Get aggregated analytics for all events owned by an organizer (company user)
+     * - totalRegistrations is computed by summing event_counters.reg_count when available
+     * - falls back to counting registrations when counters are missing
+     */
+    async getOrganizerStats(organizerId: string): Promise<Analytics> {
+        let totalRegistrations = 0;
+        try {
+            if (isSupabaseEnabled && supabase) {
+                // Fetch the organizer's events' ids (published/approved)
+                const { data: events, error: eventsErr } = await supabase
+                    .from('events')
+                    .select('event_id')
+                    .eq('created_by', organizerId)
+                    .in('status', ['published', 'approved'])
+                    .order('starts_at', { ascending: true });
+
+                if (eventsErr) throw eventsErr;
+                const ids = (events ?? []).map((e: any) => e.event_id ?? e.id).filter(Boolean) as string[];
+
+                if (ids.length === 0) {
+                    // no events -> zero
+                    return {
+                        totalRegistrations: 0,
+                        ticketsSold: 0,
+                        checkedIn: 0,
+                        attendanceRate: 0,
+                        eventsByCategory: {},
+                        registrationTrend: [],
+                    };
+                }
+
+                // Try counters table first (batched)
+                try {
+                    const { data: counters, error: countersErr } = await supabase
+                        .from('event_counters')
+                        .select('event_id, reg_count')
+                        .in('event_id', ids as string[]);
+                    if (!countersErr && counters && (counters as any[]).length > 0) {
+                        totalRegistrations = (counters as any[]).reduce((sum, c) => sum + Number(c.reg_count ?? 0), 0);
+                    } else {
+                        // Fallback: count registrations across event_ids
+                        const { count } = await supabase
+                            .from('registrations')
+                            .select('registration_id', { head: true, count: 'exact' })
+                            .in('event_id', ids as string[]);
+                        totalRegistrations = Number(count ?? 0);
+                    }
+                } catch {
+                    // Fallback to registrations count
+                    const { count } = await supabase
+                        .from('registrations')
+                        .select('registration_id', { head: true, count: 'exact' })
+                        .in('event_id', ids as string[]);
+                    totalRegistrations = Number(count ?? 0);
+                }
+            } else {
+                // Local/mock mode: sum local ticket storage for organizer events
+                // We can approximate by fetching events via listEvents (local will return mockEvents)
+                const events = await listEvents({ orgIds: [organizerId] });
+                const promises = events.map((ev) => db.getEventTicketCount(ev.id));
+                const counts = await Promise.all(promises);
+                totalRegistrations = counts.reduce((s, c) => s + c, 0);
+            }
+        } catch {
+            totalRegistrations = 0;
+        }
+
+        return {
+            totalRegistrations,
+            ticketsSold: totalRegistrations,
+            checkedIn: 0,
+            attendanceRate: 0,
+            eventsByCategory: {},
+            registrationTrend: [],
         };
     },
 };

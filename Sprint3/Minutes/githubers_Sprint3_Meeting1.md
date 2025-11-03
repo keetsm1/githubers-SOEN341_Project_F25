@@ -31,11 +31,11 @@
         </tr>
         <tr>
           <td>Present</td>
-          <td>Ranjit, Widjane, Kevin, Arnav, Lorne, Saad, Gunkeet</td>
+          <td>Ranjit, Widjane, Kevin, Lorne, Saad, Gunkeet</td>
         </tr>
         <tr>
           <td>Absent</td>
-          <td>—</td>
+          <td>—Arnav</td>
         </tr>
       </table>
     </td>
@@ -112,3 +112,4 @@
     <td>Planned</td>
   </tr>
   <tr>
+

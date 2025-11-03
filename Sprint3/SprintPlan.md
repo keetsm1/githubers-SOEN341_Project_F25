@@ -25,10 +25,10 @@ The primary goals for Sprint 3 were to:
 ## 👥 Team Members & Roles
 | Name    | Role |
 |---------|------|
-| Ranjit  | Scrum Master, Issue Manager |
+| Ranjit  | Scrum Master, Documentaion , Fullstack support |
 | Gunkeet | Frontend, Admin developer and Backend support |
 | Wijdane | Frontend |
-| Arnav   | Backend Developer/Database |
+| Arnav   | Backend Developer and Database manager|
 | Kevin   | Frontend |
 | Saad    | Documentation |
 | Lorne   | Backend |
@@ -44,16 +44,14 @@ The primary goals for Sprint 3 were to:
 | [USER STORY] US.11 – Generate Ticket with QR Code | Gunkeet | Student, Frontend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#101](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/101) |
 | [USER STORY] US.12 – Documentation | Saad | Documentation | 9 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#145](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/145) |
 | [USER STORY] US.13 – Cancel RSVP | Widjane | Student, Frontend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#107](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/107) |
+| [USER STORY] US.14 – Event Management by Organizer | Ranjit | Organizer, Frontend, Backend | 7 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/149 |
 | [USER STORY] US.15 – Real-Time Attendance Dashboard | Lorne | Organizer, Frontend, Backend | 9 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#114](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/114) |
 | [USER STORY] US.16 – View Registration Trends | Kevin | Organizer, Analytics | 6 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#118](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/118) |
 | [USER STORY] US.17 – Track Attendance Rate | Lorne | Organizer, Backend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#121](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/121) |
-| [USER STORY] US.18 – Admin-Level System Analytics | Gunkeet | Admin, Backend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#124](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/124) |
+| [USER STORY] US.18 – Admin-Level System Analytics | Gunkeet | Admin, Backend | 5 | Oct 13, 2025 | Nov 1, 2025 | 🔲 Not Started | [#124](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/124) |
 | [USER STORY] US.19 – Event Popularity Metrics | Kevin | Organizer, Frontend | 5 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | [#127](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/127) |
-| [USER STORY] US.21 – Database Management for Sprint 3 | Arnav | Backend | 8 | Oct 13, 2025 | Nov 1, 2025 | ⏳ In Progress | [#155](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/155) |
-
-> **Status Legend:**  
-> ✅ Completed | ⏳ In Progress | 🔲 Not Started | ⚠ Blocked
-
+| [USER STORY] US.20 – Admin Approval & Analytics | Ranjit | Admin, Backend | 7 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/150 |
+| [USER STORY] US.22 – Scrum Master Coordination | Ranjit | Scrum Master, Coordination | 11 | Oct 13, 2025 | Nov 1, 2025 | ✅ Completed | https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/156 |
 
 > **Status Legend:**  
 > ✅ Completed | ⏳ In Progress | 🔲 Not Started | ⚠ Blocked
@@ -64,10 +62,11 @@ The primary goals for Sprint 3 were to:
 
 | Metric | Target | Delivered | Status |
 |--------|--------|------------|--------|
-| **Total Story Points** | 83 | 83 | ✅ On Track |
-| **Completed Story Points** | 83 | 83 | ✅ On Track |
-| **Completion Rate** | 100% | 100% | ✅ On Track |
-| **Velocity** | 83 | 83 | ✅ On Track |
+| **Total Story Points** | 100 | 100 | ✅ On Track |
+| **Completed Story Points** | 100 | 95 | ⚠️ Behind |
+| **Completion Rate** | 100% | 95% | ⚠️ Behind |
+| **Velocity** | 100 | 95 | ⚠️ Behind |
+
 
 > **Status Legend:**  
 ✅ On Track – Delivery matches or exceeds target.  
@@ -115,3 +114,4 @@ The team delivered student RSVP and ticket systems, organizer analytics dashboar
 Through continued collaboration and well-defined roles, the team sustained momentum and prepared for final integration and user testing in Sprint 4.
 
 ---
+

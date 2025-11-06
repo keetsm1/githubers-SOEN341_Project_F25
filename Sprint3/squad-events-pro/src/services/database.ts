@@ -236,7 +236,7 @@ export type EventInsert = {
     location?: string | null;
     max_cap?: number | null;
     image_url?: string | null;
-    status?: 'draft' | 'published' | 'cancelled';
+    status?: 'pending' | 'published' | 'cancelled' | 'draft';
     category?: string | null;
     tags?: string[] | null;
     // ticket_type?: 'free' | 'paid' | 'rsvp' // if you add later
@@ -650,7 +650,8 @@ export const db = {
                 ? (eventData.maxCapacity as number)
                 : null,
             image_url: eventData.imageUrl ?? null,
-            status: false,
+            // Always create as pending; admins can later publish/approve
+            status: 'pending',
             // New columns added to events: category and org_name
             category: (eventData.tags && eventData.tags.length > 0)
                 ? eventData.tags.join(',')

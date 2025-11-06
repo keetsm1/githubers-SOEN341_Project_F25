@@ -175,6 +175,11 @@ export interface Friendship {
     createdAt: string;
 }
 
+export interface FriendsEvent {
+    event: Event;
+    friendIds: string[]; // which friends are attending this event
+}
+
 export interface IncomingFriendRequest {
     requestId: string;
     requesterId: string;
@@ -842,15 +847,26 @@ export const db = {
         } catch {
             // If lookup fails, continue; server will enforce rules
         }
+
         if (isSupabaseEnabled && supabase) {
             // Always use the current session user; ignore any external id to avoid mismatch
             const uid = await requireAuth();
-            // Prefer atomic RPC if available
+
+            // 1) Prefer atomic RPC if available
             const { data: rpcData, error: rpcError } = await supabase.rpc('register_for_event', {
                 p_event_id: eventId,
             });
             if (!rpcError && rpcData) {
-                // New RPC returns tickets row
+                // Mirror to event_registrations (friends' events use this table)
+                try {
+                    await supabase
+                        .from('event_registrations')
+                        .upsert(
+                            { event_id: eventId, user_id: uid, status: 'registered' },
+                            { onConflict: 'event_id,user_id' }
+                        );
+                } catch { /* ignore mirror errors */ }
+
                 const t = rpcData as any;
                 setRecentlyJoined(uid, eventId);
                 return {
@@ -862,20 +878,18 @@ export const db = {
                     createdAt: t.created_at ?? new Date().toISOString(),
                 } as Ticket;
             }
-            // Fallback to safe client-side checks + insert with unique constraint
+
+            // 2) Fallbacks if RPC failed
             if (rpcError) {
                 const msg = (rpcError as any)?.message || '';
                 if (/already registered/i.test(msg) || (rpcError as any)?.code === '23505') {
                     throw new Error('You have already RSVPed to this event.');
                 }
-                if (/capacity/i.test(msg)) {
-                    throw new Error('Event is at capacity.');
-                }
-                if (/not published/i.test(msg)) {
-                    throw new Error('Event is not published.');
-                }
+                if (/capacity/i.test(msg)) throw new Error('Event is at capacity.');
+                if (/not published/i.test(msg)) throw new Error('Event is not published.');
             }
-            // As a last resort, insert registration; rely on unique constraint to block dupes
+
+            // 3) Client-side insert into registrations
             const { data: reg, error: regErr } = await supabase
                 .from('registrations')
                 .insert({ event_id: eventId, user_id: uid })
@@ -883,12 +897,11 @@ export const db = {
                 .single();
             if (regErr) {
                 const code = (regErr as any)?.code;
-                if (code === '23505') {
-                    throw new Error('You have already RSVPed to this event.');
-                }
+                if (code === '23505') throw new Error('You have already RSVPed to this event.');
                 throw regErr;
             }
-            // Create ticket row tied to the registration
+
+            // 4) Create ticket row (if tickets table exists)
             let ticketRow: any | null = null;
             try {
                 const { data: t, error: tErr } = await supabase
@@ -904,9 +917,19 @@ export const db = {
                 if (tErr) throw tErr;
                 ticketRow = t;
             } catch {
-                // If tickets table not present, degrade to registration-based ticket
                 ticketRow = null;
             }
+
+            // 5) Mirror to event_registrations for friends view
+            try {
+                await supabase
+                    .from('event_registrations')
+                    .upsert(
+                        { event_id: eventId, user_id: uid, status: 'registered' },
+                        { onConflict: 'event_id,user_id' }
+                    );
+            } catch { /* ignore mirror errors */ }
+
             setRecentlyJoined(uid, eventId);
             if (ticketRow) {
                 return {
@@ -929,29 +952,22 @@ export const db = {
             } as Ticket;
         }
 
-        // Local storage fallback
+        // Local storage fallback (unchanged)
         const { readJSON, writeJSON } = await import('@/lib/storage');
         const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
-        const uidLS = _userId || (() => {
-            try {
-                const raw = localStorage.getItem('campusUser');
-                return raw ? (JSON.parse(raw)?.id as string | undefined) : undefined;
-            } catch { return undefined; }
-        })() || 'local-user';
-        const exists = all.find(t => t.eventId === eventId && t.userId === uidLS);
-        if (exists) {
-            throw new Error('You have already RSVPed to this event.');
-        }
-        try {
-            const ev = await getEventById(eventId);
-            const cap = ev?.max_cap ?? null;
-            if (cap !== null && typeof cap === 'number' && cap > 0) {
-                const currentCount = all.filter(t => t.eventId === eventId).length;
-                if (currentCount >= cap) {
-                    throw new Error('Event is at capacity.');
+        const uidLS =
+            _userId ||
+            (() => {
+                try {
+                    const raw = localStorage.getItem('campusUser');
+                    return raw ? (JSON.parse(raw)?.id as string | undefined) : undefined;
+                } catch {
+                    return undefined;
                 }
-            }
-        } catch {}
+            })() ||
+            'local-user';
+        const exists = all.find((t) => t.eventId === eventId && t.userId === uidLS);
+        if (exists) throw new Error('You have already RSVPed to this event.');
         const ticket: Ticket = {
             id: Date.now().toString(),
             eventId,
@@ -1011,20 +1027,31 @@ export const db = {
         // Cancel the current user's RSVP for an event (deletes ticket and registration)
         if (isSupabaseEnabled && supabase) {
             const uid = await requireAuth();
-            // Prefer atomic RPC to handle deletion and counters consistently
+
+            // Prefer RPC to remove ticket + registration
             const { error } = await supabase.rpc('cancel_event_registration', {
                 p_event_id: eventId,
             });
             if (error) throw error;
-            // Clear local recent-join cache so UI stops treating it as joined
+
+            // Also remove the mirror from event_registrations so friends' list updates
+            try {
+                await supabase
+                    .from('event_registrations')
+                    .delete()
+                    .eq('event_id', eventId)
+                    .eq('user_id', uid);
+            } catch { /* ignore mirror errors */ }
+
             clearRecentlyJoined(uid, eventId);
             return;
         }
-        // Local storage fallback
+
+        // Local storage fallback (unchanged)
         const { readJSON, writeJSON } = await import('@/lib/storage');
         const all: Ticket[] = readJSON<Ticket[]>('tickets', []);
         const uidLS = getLocalUid();
-        const next = all.filter(t => !(t.eventId === eventId && (!uidLS || t.userId === uidLS)));
+        const next = all.filter((t) => !(t.eventId === eventId && (!uidLS || t.userId === uidLS)));
         writeJSON<Ticket[]>('tickets', next);
         if (uidLS) clearRecentlyJoined(uidLS, eventId);
     },
@@ -1239,47 +1266,136 @@ export const db = {
         }));
     },
 
-    async getFriendsEvents(userId: string): Promise<Event[]> {
+    async getFriendsEvents(userId: string): Promise<FriendsEvent[]> {
         const uid = await requireAuth();
         if (!supabase) throw new Error('Supabase not configured');
+        if (uid !== userId) throw new Error('Unauthorized');
 
-        const { data: friendRows, error: fErr } = await supabase
-            .from('friendships')
-            .select('friend_id')
-            .eq('user_id', uid);
-        if (fErr) throw fErr;
+        // 1) Who are my friends?  (accepted friend_requests both directions)
+        const { data: fr1, error: e1 } = await supabase
+            .from('friend_requests')
+            .select('addressee_id')
+            .eq('requester_id', uid)
+            .eq('status', 'accepted');
 
-        const friendIds = (friendRows ?? []).map((r) => r.friend_id);
-        if (friendIds.length === 0) return [];
+        const { data: fr2, error: e2 } = await supabase
+            .from('friend_requests')
+            .select('requester_id')
+            .eq('addressee_id', uid)
+            .eq('status', 'accepted');
 
+        if (e1) throw e1;
+        if (e2) throw e2;
+
+        const friendIds = [
+            ...(fr1?.map((r: any) => r.addressee_id) ?? []),
+            ...(fr2?.map((r: any) => r.requester_id) ?? []),
+        ];
+        const uniqueFriendIds = Array.from(new Set(friendIds));
+        if (uniqueFriendIds.length === 0) return [];
+
+        // 2) Which events do those friends have registrations for?
+        // Prefer tickets table
+        let rows: { event_id: string; user_id: string; status?: string | null }[] = [];
+        {
+            const { data: tickets, error: tErr } = await supabase
+                .from('tickets')
+                .select('event_id, user_id')
+                .in('user_id', uniqueFriendIds);
+
+            if (!tErr && tickets) {
+                rows = tickets as any[];
+            }
+        }
+
+        // Fallback to event_registrations if no tickets found
+        if (rows.length === 0) {
+            const { data: regs, error: rErr } = await supabase
+                .from('event_registrations')
+                .select('event_id, user_id, status')
+                .in('user_id', uniqueFriendIds);
+
+            if (!rErr && regs) rows = regs as any[];
+        }
+
+        // Fallback to legacy registrations (if used in your app)
+        if (rows.length === 0) {
+            const { data, error } = await supabase
+                .from('registrations')
+                .select('event_id, user_id')
+                .in('user_id', uniqueFriendIds);
+
+            if (!error && data) {
+                rows = (data as any[]).map((r) => ({ event_id: r.event_id, user_id: r.user_id }));
+            }
+        }
+
+        if (rows.length === 0) return [];
+
+        // Only count "real" RSVPs if status exists
+        const attending = rows.filter((r) => {
+            if (r.status == null) return true;
+            const s = String(r.status).toLowerCase();
+            return s === 'confirmed' || s === 'registered' || s === 'attending' || s === 'valid';
+        });
+
+        // 3) Group friend IDs per event
+        const eventToFriendIds = new Map<string, Set<string>>();
+        for (const r of attending) {
+            if (!eventToFriendIds.has(r.event_id)) eventToFriendIds.set(r.event_id, new Set());
+            eventToFriendIds.get(r.event_id)!.add(r.user_id);
+        }
+        const eventIds = Array.from(eventToFriendIds.keys());
+        if (eventIds.length === 0) return [];
+
+        // 4) Load event details
         const { data: events, error: eErr } = await supabase
             .from('events')
             .select(`
-        event_id, title, description, starts_at, ends_at, location,
-        max_cap, image_url, status, created_at, created_by, category
-      `)
-            .in('created_by', friendIds)
-            .eq('status', 'published')
+      event_id,
+      title,
+      description,
+      starts_at,
+      ends_at,
+      location,
+      max_cap,
+      image_url,
+      status,
+      created_at,
+      created_by,
+      category
+    `)
+            .in('event_id', eventIds)
             .order('starts_at', { ascending: true });
 
         if (eErr) throw eErr;
 
-        return (events ?? []).map((ev: any) => ({
-            id: ev.event_id,
-            title: ev.title,
-            description: ev.description ?? '',
-            date: ev.starts_at,
-            location: ev.location ?? '',
-            category: ev.category ?? 'Social',
-            organizerId: ev.created_by,
-            organizerName: 'Friend',
-            maxCapacity: ev.max_cap ?? 0,
-            currentAttendees: 0,
-            imageUrl: ev.image_url ?? undefined,
-            tags: [],
-            isApproved: (ev.status === true) || (typeof ev.status === 'string' && ['published','approved'].includes(ev.status.toLowerCase())),
-            createdAt: ev.created_at,
-        }));
+        // 5) Map rows into Event + friendIds
+        return (events ?? []).map((ev: any) => {
+            const baseEvent: Event = {
+                id: ev.event_id,
+                title: ev.title,
+                description: ev.description ?? '',
+                date: ev.starts_at,
+                location: ev.location ?? '',
+                category: ev.category ?? 'Social',
+                organizerId: ev.created_by,
+                organizerName: 'Organizer',
+                maxCapacity: ev.max_cap ?? 0,
+                currentAttendees: 0,
+                imageUrl: ev.image_url ?? undefined,
+                tags: [],
+                isApproved:
+                    ev.status === true ||
+                    (typeof ev.status === 'string' && ['published', 'approved'].includes(ev.status.toLowerCase())),
+                createdAt: ev.created_at,
+            };
+
+            return {
+                event: baseEvent,
+                friendIds: Array.from(eventToFriendIds.get(ev.event_id) ?? []),
+            } as FriendsEvent;
+        });
     },
 
     // Expose friend-request helpers for the Friends page

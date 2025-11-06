@@ -20,7 +20,13 @@ import EventCard from '@/components/events/EventCard';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from '@/components/auth/LoginForm';
 
-import { db, Event, Friendship, IncomingFriendRequest, supabase } from '@/services/database';
+import {
+    db,
+    Friendship,
+    FriendsEvent,
+    IncomingFriendRequest,
+    supabase,
+} from '@/services/database';
 
 function initials(name?: string | null) {
     if (!name) return '??';
@@ -41,7 +47,7 @@ const Friends: React.FC = () => {
         Record<string, { full_name: string | null; avatar_url: string | null; email?: string | null }>
     >({});
     const [requests, setRequests] = useState<IncomingFriendRequest[]>([]);
-    const [friendsEvents, setFriendsEvents] = useState<Event[]>([]);
+    const [friendsEvents, setFriendsEvents] = useState<FriendsEvent[]>([]);
     const [searchEmail, setSearchEmail] = useState('');
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<'friends' | 'requests' | 'events'>('friends');
@@ -125,6 +131,48 @@ const Friends: React.FC = () => {
         };
     }, [user, toast]);
 
+    // Live-update friends' events when new registrations are written/changed
+    useEffect(() => {
+        if (!user || !supabase) return;
+
+        const refresh = async () => {
+            try {
+                const updated = await db.getFriendsEvents(user.id);
+                setFriendsEvents(updated);
+            } catch (err) {
+                console.error('Failed to refresh friends events', err);
+            }
+        };
+
+        const ch1 = supabase
+            .channel(`friends-events-regs-${user.id}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'event_registrations' },
+                refresh
+            )
+            .subscribe();
+
+        // Legacy path (if your RSVP code writes into `registrations`)
+        const ch2 = supabase
+            .channel(`friends-events-legacy-${user.id}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'registrations' },
+                refresh
+            )
+            .subscribe();
+
+        return () => {
+            try {
+                supabase.removeChannel(ch1);
+                supabase.removeChannel(ch2);
+            } catch {
+                // ignore
+            }
+        };
+    }, [user?.id]);
+
     const onSend = async () => {
         if (!searchEmail.trim()) return;
         try {
@@ -188,7 +236,9 @@ const Friends: React.FC = () => {
             const prof = friendsProfiles[f.friendId];
             const name = prof?.full_name ?? `User ${f.friendId.slice(0, 6)}`;
             const email = prof?.email ?? 'hidden';
-            const avatar = prof?.avatar_url ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+            const avatar =
+                prof?.avatar_url ??
+                `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
             return (
                 <Card key={f.id} className="shadow-card hover:shadow-elevated transition-shadow">
                     <CardContent className="p-6">
@@ -222,7 +272,9 @@ const Friends: React.FC = () => {
                 {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-foreground mb-2">Friends</h1>
-                    <p className="text-muted-foreground">Connect with classmates and discover events together</p>
+                    <p className="text-muted-foreground">
+                        Connect with classmates and discover events together
+                    </p>
                 </div>
 
                 {/* Add Friend */}
@@ -360,11 +412,7 @@ const Friends: React.FC = () => {
                                                             <Check className="w-4 h-4 mr-1" />
                                                             Accept
                                                         </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => onDecline(req.requestId)}
-                                                        >
+                                                        <Button size="sm" variant="outline" onClick={() => onDecline(req.requestId)}>
                                                             <XIcon className="w-4 h-4 mr-1" />
                                                             Decline
                                                         </Button>
@@ -402,24 +450,50 @@ const Friends: React.FC = () => {
                                     <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                                     <h3 className="text-xl font-semibold mb-2">No Friends' Events</h3>
                                     <p className="text-muted-foreground">
-                                        Your friends haven’t published any events yet.
+                                        Your friends haven’t joined any events yet.
                                     </p>
                                 </CardContent>
                             </Card>
                         ) : (
                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {friendsEvents.map((event) => (
-                                    <EventCard
-                                        key={event.id}
-                                        event={event}
-                                        onRSVP={async (eventId) => {
-                                            // You can wire real RSVP later; for now keep your mocked ticket creation
-                                            await db.createTicket(eventId, user.id);
-                                            toast({ title: 'RSVP created' });
-                                        }}
-                                        showActions={true}
-                                    />
-                                ))}
+                                {friendsEvents.map(({ event, friendIds }) => {
+                                    const friendsForEvent = friendIds.map((fid) => {
+                                        const prof = friendsProfiles[fid];
+                                        const name = prof?.full_name ?? `Friend ${fid.slice(0, 6)}`;
+                                        const avatar =
+                                            prof?.avatar_url ??
+                                            `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+                                        return { id: fid, name, avatar };
+                                    });
+
+                                    return (
+                                        <div key={event.id} className="space-y-3">
+                                            <EventCard
+                                                event={event}
+                                                onRSVP={async (eventId) => {
+                                                    await db.createTicket(eventId, user.id);
+                                                    toast({ title: 'RSVP created' });
+                                                }}
+                                                showActions={true}
+                                            />
+
+                                            {/* Friends attending row */}
+                                            <div className="px-4 pb-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                <Users className="w-4 h-4" />
+                                                <span className="font-medium">Friends attending:</span>
+                                                {friendsForEvent.map((f) => (
+                                                    <Badge key={f.id} variant="outline" className="flex items-center gap-1 px-2 py-1">
+                                                        <Avatar className="w-5 h-5">
+                                                            <AvatarImage src={f.avatar} alt={f.name} />
+                                                            <AvatarFallback>{initials(f.name)}</AvatarFallback>
+                                                        </Avatar>
+                                                        <span>{f.name}</span>
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </TabsContent>

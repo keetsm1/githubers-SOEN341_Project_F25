@@ -1,6 +1,1 @@
-| Date       | Task(s)                    | Time Spent | Notes                                                                                                                                                     |
-|-------------|---------------------------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 2025-10-31  | Event approval not showing up | 3 hrs       | Once an organization created an event it was submitted for approval. However, it did not show up in the events tab due to the status column being false instead of pending. |
-| 2025-10-31  | Sign-Out Issue            | 2 hrs       | Users who were on the friend page were not successfully logged and redirected to the login page. It was fixed.                                             |
-| 2025-11-02  | Task.15.2                 | 2 hrs       | I helped Lorne with a DB issue relating to RLS policies on the events table. I conducted the appropriate research of the issue and deployed the fix in the DB. |
-| 2025-11-02  | Task.15.3                 | 15 mins     | Lorne ran into the issue again related to RLS policies for the registration table. I applied a similar fix to Task 15.2.                                   |
+

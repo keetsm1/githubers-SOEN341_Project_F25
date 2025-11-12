@@ -10,6 +10,7 @@ import {
   Download
 } from 'lucide-react';
 import Navigation from '@/components/layout/Navigation';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { db, Analytics as AnalyticsType, Event } from '@/services/database';
 import { supabase, isSupabaseEnabled } from '@/lib/supabase';
@@ -25,7 +26,6 @@ const Analytics = () => {
   const [loading, setLoading] = useState(true);
   const [recent, setRecent] = useState<Array<{ action: string; event: string; time: string }>>([]);
   const [trend, setTrend] = useState<{ date: string; rsvps: number; checkins: number }[]>([]);
-  const [series, setSeries] = useState<'rsvps' | 'checkins'>('rsvps');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [filteredAnalytics, setFilteredAnalytics] = useState<AnalyticsType | null>(null);
   const [filteredTrend, setFilteredTrend] = useState<{ date: string; rsvps: number; checkins: number }[]>([]);
@@ -254,9 +254,7 @@ const Analytics = () => {
                     <div>
                       <p className="text-sm text-muted-foreground">Total Registrations</p>
                       <p className="text-3xl font-bold text-accent">
-                        {selectedEventId
-                          ? filteredAnalytics?.totalRegistrations || 0
-                          : analytics?.totalRegistrations || 0}
+                        {selectedEventId ? filteredAnalytics?.totalRegistrations || 0 : analytics?.totalRegistrations || 0}
                       </p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
@@ -274,9 +272,7 @@ const Analytics = () => {
                     <div>
                       <p className="text-sm text-muted-foreground">Attendance Rate</p>
                       <p className="text-3xl font-bold text-primary">
-                        {selectedEventId
-                          ? filteredAnalytics?.attendanceRate || 0
-                          : analytics?.attendanceRate || 0}%
+                        {selectedEventId ? filteredAnalytics?.attendanceRate || 0 : analytics?.attendanceRate || 0}%
                       </p>
                       <p className="text-xs text-green-600 flex items-center mt-1">
                         <TrendingUp className="w-3 h-3 mr-1" />
@@ -313,21 +309,28 @@ const Analytics = () => {
             <div className="grid lg:grid-cols-2 gap-8 mb-8">
               <Card className="shadow-card">
                 <CardHeader>
-                  <CardTitle>
-                    {selectedEventId ? 'Event Details' : 'Event Performance'}
+                  <CardTitle>Event Performance
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {selectedEventId
-                      ? myEvents
+                      ? myEvents.sort((a, b) => (b.currentAttendees || 0) - (a.currentAttendees || 0))
                         .map((event) => (
                           <div
                             key={event.id}
                             onClick={() => handleEventFilter(selectedEventId === event.id ? null : event.id)}
-                            className={`flex items-center justify-between p-4 rounded-lg cursor-pointer ${selectedEventId === event.id ? 'bg-muted/40 ring-2 ring-primary' : 'bg-muted/30'}`}>
+                            className={`flex items-center justify-between p-4 rounded-lg cursor-pointer ${selectedEventId === event.id ? 'bg-blue-100 ring-2 ring-blue-500 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500' : 'bg-muted/30 hover:bg-blue-50 hover:ring-2 hover:ring-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-200'}`}>
                             <div className="flex-1">
-                              <h3 className="font-medium">{event.title}</h3>
+                              <h3 className="font-medium">
+                                <Link
+                                  to={`/events/${event.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="hover:underline"
+                                >
+                                  {event.title}
+                                </Link>
+                              </h3>
                               <p className="text-sm text-muted-foreground">
                                 {event.currentAttendees} / {event.maxCapacity} attendees
                               </p>
@@ -346,9 +349,17 @@ const Analytics = () => {
                           <div
                             key={event.id}
                             onClick={() => handleEventFilter(selectedEventId === event.id ? null : event.id)}
-                            className={`flex items-center justify-between p-4 rounded-lg cursor-pointer ${selectedEventId === event.id ? 'bg-muted/40 ring-2 ring-primary' : 'bg-muted/30'}`}>
+                            className={`flex items-center justify-between p-4 rounded-lg cursor-pointer ${selectedEventId === event.id ? 'bg-blue-100 ring-2 ring-blue-500 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500' : 'bg-muted/30 hover:bg-blue-50 hover:ring-2 hover:ring-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-200'}`}>
                             <div className="flex-1">
-                              <h3 className="font-medium">{event.title}</h3>
+                              <h3 className="font-medium">
+                                <Link
+                                  to={`/events/${event.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="hover:underline"
+                                >
+                                  {event.title}
+                                </Link>
+                              </h3>
                               <p className="text-sm text-muted-foreground">
                                 {event.currentAttendees} / {event.maxCapacity} attendees
                               </p>
@@ -369,10 +380,8 @@ const Analytics = () => {
               <Card className="shadow-card">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>{series === 'rsvps' ? 'RSVPs' : 'Check-ins'} (Last 14 days)</CardTitle>
+                    <CardTitle>RSVPs vs Check-ins (Last 14 days)</CardTitle>
                     <div className="flex gap-2 text-xs">
-                      <Button size="sm" variant={series === 'rsvps' ? 'default' : 'outline'} onClick={() => setSeries('rsvps')}>RSVPs</Button>
-                      <Button size="sm" variant={series === 'checkins' ? 'default' : 'outline'} onClick={() => setSeries('checkins')}>Check-ins</Button>
                     </div>
                   </div>
                 </CardHeader>

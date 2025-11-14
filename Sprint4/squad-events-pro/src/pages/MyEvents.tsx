@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import Navigation from '@/components/layout/Navigation';
 import StarredEvents from './StarredEvents';
 import EventCard from '@/components/events/EventCard';
+import DeleteEventDialog from '@/components/events/DeleteEventDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { db, Event, Ticket as TicketType } from '@/services/database';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +32,8 @@ const MyEvents = () => {
     const [loading, setLoading] = useState(true);
     const [starredCount, setStarredCount] = useState(0);
     const [qrToShow, setQrToShow] = useState<string | null>(null);
+    const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
     useEffect(() => {
         if (user && user.role === 'student') {
@@ -71,43 +74,34 @@ const MyEvents = () => {
         navigate(`/events/${eventId}/edit`);
     };
 
-    const handleDeleteEvent = async (eventId: string) => {
+    const handleDeleteById = (eventId: string) => {
+        const ev = myEvents.find(e => ((e as any).id ?? (e as any).event_id) === eventId) || null;
+        setDeletingEvent(ev as Event | null);
+        setDeleteDialogOpen(Boolean(ev));
+    };
+
+    const handleConfirmDelete = async (eventId: string) => {
         if (!user) return;
-        const ev = myEvents.find(e => ((e as any).id ?? (e as any).event_id) === eventId);
-        const isPending =
-            (ev as any)?.status === 'pending' ||
-            (ev as any)?.statusText === 'pending' ||
-            (ev as any)?.isApproved === false;
-
-        if (!isPending && user.role !== 'admin') {
-            alert('Only pending events can be deleted.');
-            return;
-        }
-
-        if (!confirm('Delete this pending event? This action cannot be undone.')) {
-            return;
-        }
-
         // Optimistic remove
         const prev = myEvents;
         setMyEvents(prev.filter(e => ((e as any).id ?? (e as any).event_id) !== eventId));
-
         try {
-            // Prefer a pending-guarded helper if available
             const svc: any = db as any;
-            if (typeof svc.deleteEventPendingOwned === 'function') {
+            if (typeof svc.deleteEventOwnedPending === 'function') {
+                await svc.deleteEventOwnedPending(eventId);
+            } else if (typeof svc.deleteEventPendingOwned === 'function') {
                 await svc.deleteEventPendingOwned(eventId, user.id);
             } else {
                 await db.deleteEvent(eventId);
             }
-
-            // Reload to stay in sync (also ensures admin pending list sees it if shared cache exists)
             await loadMyData();
         } catch (error) {
             console.error('Error deleting event:', error);
             // Rollback
             setMyEvents(prev);
-            alert('Delete failed. Make sure the event is still pending and you are the organizer.');
+        } finally {
+            setDeleteDialogOpen(false);
+            setDeletingEvent(null);
         }
     };
 
@@ -242,7 +236,7 @@ const MyEvents = () => {
                                         key={ev.id ?? ev.event_id}
                                         event={ev}
                                         onEdit={handleEditEvent}
-                                        onDelete={handleDeleteEvent}
+                                        onDelete={handleDeleteById}
                                         showActions={true}
                                     />
                                 ))}
@@ -251,6 +245,17 @@ const MyEvents = () => {
                     </div>
                 )}
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <DeleteEventDialog
+                event={deletingEvent}
+                open={deleteDialogOpen}
+                onOpenChange={(open) => {
+                    setDeleteDialogOpen(open);
+                    if (!open) setDeletingEvent(null);
+                }}
+                onConfirm={handleConfirmDelete}
+            />
 
             {/* QR Viewer Dialog */}
             <AlertDialog open={qrToShow !== null} onOpenChange={(open) => !open && setQrToShow(null)}>

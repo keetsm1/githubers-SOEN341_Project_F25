@@ -787,7 +787,66 @@ export const db = {
     },
 
     async updateEvent(id: string, updates: Partial<Event>): Promise<Event> {
-        // Kept mocked for now
+        if (isSupabaseEnabled && supabase) {
+            const dbUpdates: EventUpdate = {};
+            if (updates.title !== undefined) dbUpdates.title = updates.title;
+            if (updates.description !== undefined) dbUpdates.description = updates.description ?? null;
+            if (updates.date !== undefined) {
+                dbUpdates.starts_at = updates.date;
+                try {
+                    const base = new Date(updates.date);
+                    dbUpdates.ends_at = new Date(base.getTime() + 60 * 60 * 1000).toISOString();
+                } catch {
+                    // ignore bad date; server may enforce
+                }
+            }
+            if (updates.location !== undefined) dbUpdates.location = updates.location ?? null;
+            if (updates.category !== undefined) dbUpdates.category = updates.category ?? null;
+            if (updates.maxCapacity !== undefined) dbUpdates.max_cap = updates.maxCapacity ?? null;
+            if (updates.imageUrl !== undefined) dbUpdates.image_url = updates.imageUrl ?? null;
+            if (updates.tags !== undefined) dbUpdates.tags = updates.tags ?? null;
+
+            const { data, error } = await supabase
+                .from('events')
+                .update(dbUpdates)
+                .eq('event_id', id)
+                .select('*')
+                .single();
+            if (error) throw error;
+
+            const ev: any = data;
+            const raw = ev.status;
+            let isApproved: boolean;
+            let statusText: 'approved' | 'pending' | 'rejected';
+            if (typeof raw === 'boolean') {
+                isApproved = raw; statusText = raw ? 'approved' : 'pending';
+            } else if (typeof raw === 'string') {
+                const s = raw.toLowerCase();
+                if (s === 'rejected') { isApproved = false; statusText = 'rejected'; }
+                else if (s === 'published' || s === 'approved') { isApproved = true; statusText = 'approved'; }
+                else { isApproved = false; statusText = 'pending'; }
+            } else { isApproved = false; statusText = 'pending'; }
+
+            return {
+                id: ev.event_id ?? id,
+                title: ev.title,
+                description: ev.description ?? '',
+                date: ev.starts_at,
+                location: ev.location ?? '',
+                category: ev.category ?? 'General',
+                organizerId: ev.created_by,
+                organizerName: ev.org_name ?? 'You',
+                maxCapacity: ev.max_cap ?? 0,
+                currentAttendees: 0,
+                imageUrl: ev.image_url ?? undefined,
+                tags: ev.tags ?? [],
+                isApproved,
+                statusText,
+                createdAt: ev.created_at,
+            } as Event;
+        }
+
+        // Mock fallback
         const eventIndex = mockEvents.findIndex((e) => e.id === id);
         if (eventIndex >= 0) {
             mockEvents[eventIndex] = { ...mockEvents[eventIndex], ...updates };
@@ -797,9 +856,45 @@ export const db = {
     },
 
     async deleteEvent(id: string): Promise<void> {
-        // Kept mocked for now
+        // Generic delete; for admins prefer deleteEventAdmin below
+        if (isSupabaseEnabled && supabase) {
+            const { error } = await supabase
+                .from('events')
+                .delete()
+                .eq('event_id', id);
+            if (error) throw error;
+            return;
+        }
         const eventIndex = mockEvents.findIndex((e) => e.id === id);
         if (eventIndex >= 0) mockEvents.splice(eventIndex, 1);
+    },
+
+    async deleteEventAdmin(id: string): Promise<void> {
+        if (isSupabaseEnabled && supabase) {
+            // Try using an admin RPC if available, else direct delete
+            try {
+                const { error: rpcErr } = await supabase.rpc('admin_delete_event', { p_event_id: id });
+                if (!rpcErr) return;
+            } catch {}
+            const { error } = await supabase
+                .from('events')
+                .delete()
+                .eq('event_id', id);
+            if (error) throw error;
+            return;
+        }
+        const idx = mockEvents.findIndex((e) => e.id === id);
+        if (idx >= 0) mockEvents.splice(idx, 1);
+    },
+
+    async deleteEventOwnedPending(id: string): Promise<void> {
+        if (isSupabaseEnabled && supabase) {
+            const uid = await requireAuth();
+            await deleteEventPendingOwned(id, uid);
+            return;
+        }
+        const idx = mockEvents.findIndex((e) => e.id === id);
+        if (idx >= 0) mockEvents.splice(idx, 1);
     },
 
     /* ───────────── Tickets (local storage backed for Sprint 2) ───────────── */

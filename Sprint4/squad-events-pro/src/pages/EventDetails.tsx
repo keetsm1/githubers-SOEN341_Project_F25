@@ -249,7 +249,21 @@ const EventDetails: React.FC = () => {
         <div className="mb-6 flex items-center justify-between">
           <Button
             variant="outline"
-            onClick={() => navigate(user && (user.role === 'company' || user.role === 'admin') ? '/my-events' : '/search')}
+            onClick={() => {
+              try {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else if (user?.role === 'admin') {
+                  navigate('/admin');
+                } else if (user?.role === 'company') {
+                  navigate('/my-events');
+                } else {
+                  navigate('/search');
+                }
+              } catch {
+                navigate('/');
+              }
+            }}
           >
             <ArrowLeft className="w-4 h-4 mr-2" /> Back
           </Button>

@@ -871,11 +871,29 @@ export const db = {
 
     async deleteEventAdmin(id: string): Promise<void> {
         if (isSupabaseEnabled && supabase) {
-            // Try using an admin RPC if available, else direct delete
+            // Try using an admin RPC if available, else manual cascade delete
             try {
                 const { error: rpcErr } = await supabase.rpc('admin_delete_event', { p_event_id: id });
                 if (!rpcErr) return;
             } catch {}
+            
+            // Manual cascade: delete dependent records first
+            // 1. Delete event_counters (has FK to events)
+            await supabase.from('event_counters').delete().eq('event_id', id);
+            
+            // 2. Delete tickets (has FK to events)
+            await supabase.from('tickets').delete().eq('event_id', id);
+            
+            // 3. Delete registrations (has FK to events)
+            await supabase.from('registrations').delete().eq('event_id', id);
+            
+            // 4. Delete event_registrations (has FK to events)
+            await supabase.from('event_registrations').delete().eq('event_id', id);
+            
+            // 5. Delete starred_events (has FK to events)
+            await supabase.from('starred_events').delete().eq('event_id', id);
+            
+            // 6. Finally delete the event itself
             const { error } = await supabase
                 .from('events')
                 .delete()

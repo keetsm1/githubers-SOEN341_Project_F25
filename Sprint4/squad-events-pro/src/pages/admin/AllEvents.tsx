@@ -64,8 +64,17 @@ const AllEvents = () => {
       toast({ title: 'Success', description: 'Event deleted successfully' });
       await loadEvents();
     } catch (error) {
-      console.error('Error deleting event:', error);
-      toast({ title: 'Error', description: 'Failed to delete event', variant: 'destructive' });
+      // Check for foreign key constraint violation (approved events can't be deleted)
+      const errorCode = (error as any)?.code;
+      let errorMessage = 'Failed to delete event';
+      
+      if (errorCode === '23503') {
+        errorMessage = 'Cannot delete this event because it is approved';
+      } else if ((error as any)?.message) {
+        errorMessage = (error as any).message;
+      }
+      
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
     }
   };
 

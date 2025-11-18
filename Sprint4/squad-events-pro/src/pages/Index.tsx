@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Calendar, 
-  Users, 
-  Plus, 
-  TrendingUp, 
+import {
+  Calendar,
+  Users,
+  Plus,
+  TrendingUp,
   Star,
   Clock,
   MapPin
@@ -23,6 +23,9 @@ const Index = () => {
   const navigate = useNavigate();
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [todaysEvents, setTodaysEvents] = useState<Event[]>([]);
+  const [eventsThisWeek, setEventsThisWeek] = useState<number>(0);
+  const [myRsvps, setMyRsvps] = useState<number>(0);
+  const [friendsCount, setFriendsCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,6 +51,18 @@ const Index = () => {
         sort: 'soonest',
       });
       setTodaysEvents(todays);
+
+      // Get events this week count
+      const weekEvents = await db.getEventsThisWeek();
+      setEventsThisWeek(weekEvents.length);
+
+      // Get user's tickets count (RSVPs)
+      const ticketsCount = await db.getUserTicketsCount();
+      setMyRsvps(ticketsCount);
+
+      // Get user's friends count
+      const friendCount = await db.getUserFriendsCount();
+      setFriendsCount(friendCount);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -75,7 +90,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <Navigation />
-      
+
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Welcome Header */}
         <div className="mb-8">
@@ -88,51 +103,39 @@ const Index = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
+        <div className="grid md:grid-cols-3 gap-4 mb-8">
           <Card className="shadow-card hover:shadow-elevated transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Events This Week</p>
-                  <p className="text-2xl font-bold text-primary">12</p>
+                  <p className="text-2xl font-bold text-primary">{loading ? '-' : eventsThisWeek}</p>
                 </div>
                 <Calendar className="w-8 h-8 text-primary" />
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="shadow-card hover:shadow-elevated transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">My RSVPs</p>
-                  <p className="text-2xl font-bold text-accent">5</p>
+                  <p className="text-2xl font-bold text-accent">{loading ? '-' : myRsvps}</p>
                 </div>
                 <Star className="w-8 h-8 text-accent" />
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="shadow-card hover:shadow-elevated transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Friends Online</p>
-                  <p className="text-2xl font-bold text-primary">23</p>
+                  <p className="text-2xl font-bold text-primary">{loading ? '-' : friendsCount}</p>
                 </div>
                 <Users className="w-8 h-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="shadow-card hover:shadow-elevated transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Trending</p>
-                  <p className="text-2xl font-bold text-accent">AI Workshop</p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-accent" />
               </div>
             </CardContent>
           </Card>
@@ -142,15 +145,15 @@ const Index = () => {
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
           <div className="flex gap-4 flex-wrap">
-            <Button 
+            <Button
               onClick={() => navigate('/search')}
               className="bg-gradient-to-r from-primary to-primary/90"
             >
               <Calendar className="w-4 h-4 mr-2" />
               Browse Events
             </Button>
-            
-            <Button 
+
+            <Button
               variant="outline"
               onClick={() => navigate('/friends')}
             >
@@ -164,14 +167,14 @@ const Index = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Trending Events</h2>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => navigate('/search')}
             >
               View All
             </Button>
           </div>
-          
+
           {loading ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(3)].map((_, i) => (

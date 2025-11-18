@@ -1561,6 +1561,116 @@ export const db = {
         };
     },
 
+    /* ───────────── Dashboard Helpers ───────────── */
+
+    /**
+     * Get events happening this week (next 7 days)
+     */
+    async getEventsThisWeek(): Promise<Event[]> {
+        if (!supabase) return [];
+        
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        
+        const end = new Date();
+        end.setDate(end.getDate() + 7);
+        end.setHours(23, 59, 59, 999);
+
+        try {
+            const { data, error } = await supabase
+                .from('events')
+                .select('*')
+                .gte('starts_at', start.toISOString())
+                .lte('starts_at', end.toISOString())
+                .eq('status', 'published')
+                .order('starts_at', { ascending: true });
+
+            if (error) throw error;
+
+            return (data ?? []).map((ev: any) => ({
+                id: ev.event_id ?? ev.id,
+                title: ev.title,
+                description: ev.description ?? '',
+                date: ev.starts_at,
+                location: ev.location ?? '',
+                category: ev.category ?? 'General',
+                organizerId: ev.created_by,
+                organizerName: ev.org_name ?? 'Organization',
+                maxCapacity: ev.max_cap ?? 0,
+                currentAttendees: 0,
+                imageUrl: ev.image_url ?? undefined,
+                tags: ev.tags ?? [],
+                isApproved: ev.status === 'published' || ev.status === true,
+                createdAt: ev.created_at,
+            }));
+        } catch (error) {
+            console.error('Error fetching events this week:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Get count of current user's tickets (RSVPs)
+     */
+    async getUserTicketsCount(): Promise<number> {
+        if (!supabase) return 0;
+        
+        try {
+            const uid = await requireAuth();
+            
+            // Try tickets table first
+            const { count: tCount } = await supabase
+                .from('tickets')
+                .select('ticket_id', { count: 'exact', head: true })
+                .eq('user_id', uid);
+            
+            if (tCount !== null) return tCount;
+            
+            // Fallback to registrations
+            const { count: rCount } = await supabase
+                .from('registrations')
+                .select('registration_id', { count: 'exact', head: true })
+                .eq('user_id', uid);
+            
+            return rCount ?? 0;
+        } catch (error) {
+            console.error('Error fetching user tickets count:', error);
+            return 0;
+        }
+    },
+
+    /**
+     * Get count of current user's accepted friends
+     */
+    async getUserFriendsCount(): Promise<number> {
+        if (!supabase) return 0;
+        
+        try {
+            const uid = await requireAuth();
+
+            // Get friends where user is requester and status is accepted
+            const { count: count1, error: e1 } = await supabase
+                .from('friend_requests')
+                .select('request_id', { count: 'exact', head: true })
+                .eq('requester_id', uid)
+                .eq('status', 'accepted');
+
+            // Get friends where user is addressee and status is accepted
+            const { count: count2, error: e2 } = await supabase
+                .from('friend_requests')
+                .select('request_id', { count: 'exact', head: true })
+                .eq('addressee_id', uid)
+                .eq('status', 'accepted');
+
+            if (e1 || e2) throw e1 ?? e2;
+
+            return (count1 ?? 0) + (count2 ?? 0);
+        } catch (error) {
+            console.error('Error fetching user friends count:', error);
+            return 0;
+        }
+    },
+
     /* ───────────── Analytics (Supabase-backed) ───────────── */
 
     async getGlobalStats(): Promise<Analytics> {

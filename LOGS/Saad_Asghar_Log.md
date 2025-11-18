@@ -8,6 +8,9 @@
 | 2025-11-1 | Task.12.1 | 1 hrs | Create Wiki Structure |
 | 2025-11-1 | Task.12.2 | 1 hrs | Developer Setup |
 | 2025-11-1 | Task.12.3 | 1 hrs | Record Meeting Minuites|
+| 2025-11-18 | Task.24.1 | 1 hrs | System Testing for ALL User Roles |
+| 2025-11-18 | Task.24.2 | 1 hrs | Cross-Browser Testing (Functional Verification) |
+| 2025-11-18 | Task.24.3 | 1 hrs | Mobile Responsiveness Testing|
 
 
 

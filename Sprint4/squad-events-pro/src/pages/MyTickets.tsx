@@ -11,6 +11,7 @@ import { Calendar, MapPin, QrCode, ArrowRight, RotateCcw, Loader2, Trash2 } from
 import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { usePayment } from '@/contexts/PaymentContext';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   AlertDialog,
@@ -38,6 +39,8 @@ const MyTickets: React.FC = () => {
   const [canceling, setCanceling] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
+  const paymentCtx = usePayment();
+
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -72,7 +75,9 @@ const MyTickets: React.FC = () => {
               currentAttendees: 0,
               imageUrl: row.image_url ?? undefined,
               tags: (row as any).tags ?? [],
-              isApproved: (row as any).status === 'published' || (row as any).status === true,
+                      isApproved: (row as any).status === 'published' || (row as any).status === true,
+                      isPaid: !!(row as any).is_paid,
+                      price: row.price ? Number(row.price) : 0,
               createdAt: (row as any).created_at,
             };
             eventMap.set(eid, ev);
@@ -86,7 +91,13 @@ const MyTickets: React.FC = () => {
         ticket: t,
         event: eventMap.get(t.eventId) ?? null,
       }));
-      setItems(enriched);
+
+      // Apply local payment state so UI reflects payments persisted locally
+      const mapped = enriched.map(it => {
+        const locally = paymentCtx.hasPaidLocally(it.ticket.eventId);
+        return { ...it, ticket: { ...it.ticket, isPaid: it.ticket.isPaid || locally } };
+      });
+      setItems(mapped);
     } catch (e: any) {
       setError('Failed to load tickets.');
       // eslint-disable-next-line no-console
@@ -94,11 +105,32 @@ const MyTickets: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, paymentCtx]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Re-apply local payment state when the payment context changes (ensures persistence after refresh)
+  useEffect(() => {
+    const applyLocal = () => {
+      setItems((prev) => prev.map(it => {
+        try {
+          const locally = paymentCtx.hasPaidLocally(it.ticket.eventId);
+          return { ...it, ticket: { ...it.ticket, isPaid: it.ticket.isPaid || locally } };
+        } catch {
+          return it;
+        }
+      }));
+    };
+
+    // Run once to sync after mount
+    applyLocal();
+
+    // No subscription API on context, but re-run when provider state changes (object identity)
+    // We rely on React re-rendering consumers when context.payments updates; calling applyLocal again
+    // ensures the list reflects any new payments.
+  }, [paymentCtx.payments]);
 
   if (!user) return <LoginForm />;
 
@@ -165,11 +197,16 @@ const MyTickets: React.FC = () => {
                           'Event'
                         )}
                       </CardTitle>
-                      {event && (
-                        <div className="mt-1 flex flex-wrap gap-3 text-sm text-muted-foreground">
-                          <div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-primary" /> {format(new Date(event.date), 'PPP p')}</div>
-                          <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-primary" /> {event.location}</div>
-                        </div>
+                          {event && (
+                        <>
+                          <div className="mt-1 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                            <div className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-primary" /> {format(new Date(event.date), 'PPP p')}</div>
+                            <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-primary" /> {event.location}</div>
+                          </div>
+                          {typeof event.price !== 'undefined' && (
+                            <div className="mt-2 text-sm text-muted-foreground">Price: {event.price > 0 ? `$${event.price.toFixed(2)}` : 'Free'}</div>
+                          )}
+                        </>
                       )}
                     </div>
                     <Badge variant={ticket.isCheckedIn ? 'default' : 'outline'}>
@@ -201,6 +238,41 @@ const MyTickets: React.FC = () => {
                     >
                       <Trash2 className="w-4 h-4 mr-2" /> Cancel RSVP
                     </Button>
+                    {event && ( (event.isPaid || (event.price > 0)) ) && (
+                      (ticket.isPaid || paymentCtx.hasPaidLocally(ticket.eventId)) ? (
+                        <Button variant="primary" size="sm" disabled>Paid</Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={async () => {
+                            const amountToPay = event.price > 0 ? event.price : undefined;
+                            try {
+                              const idx = items.findIndex(it => it.ticket.id === ticket.id);
+                              const res = await db.processMockPayment(ticket.eventId, amountToPay);
+                              if (res && (String(res.status).toLowerCase() === 'success' || res.status === 'success')) {
+                                // mark locally as paid in our context
+                                try { paymentCtx.markPaid(ticket.eventId, amountToPay, res); } catch {}
+                                const copy = [...items];
+                                copy[idx] = { ...copy[idx], ticket: { ...copy[idx].ticket, isPaid: true } };
+                                setItems(copy);
+                                paymentCtx.showConfirmation({ eventId: ticket.eventId, title: event.title, amount: amountToPay, status: 'success', retry: null });
+                              } else {
+                                paymentCtx.showConfirmation({ eventId: ticket.eventId, title: event.title, amount: amountToPay, status: 'failure', retry: async () => {
+                                  /* retry closure: re-run click handler */
+                                } });
+                                toast({ variant: 'destructive', title: 'Payment Failed', description: res?.message ?? 'Mock payment failed. Try again.' });
+                              }
+                            } catch (e: any) {
+                              paymentCtx.showConfirmation({ eventId: ticket.eventId, title: event.title, amount: amountToPay, status: 'failure', retry: async () => { /* retry closure */ } });
+                              toast({ variant: 'destructive', title: 'Payment Error', description: e?.message ?? 'Failed to process payment.' });
+                            }
+                          }}
+                        >
+                          Pay Now
+                        </Button>
+                      )
+                    )}
                     {event ? (
                       <Button variant="outline" asChild>
                         <Link to={`/events/${event.id}`}>

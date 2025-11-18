@@ -152,6 +152,9 @@ export interface Event {
     imageUrl?: string;
     tags: string[];
     isApproved: boolean;
+    // Payment-related flags for UI
+    isPaid?: boolean;
+    price?: number;
     // Derived UI status for display
     statusText?: 'approved' | 'pending' | 'rejected';
     createdAt: string;
@@ -165,6 +168,8 @@ export interface Ticket {
     isCheckedIn: boolean;  // future use; not persisted yet
     checkedInAt?: string;  // future use; not persisted yet
     createdAt: string;     // created_at
+    // Paid flag (mapped from tickets or registrations)
+    isPaid?: boolean;
 }
 
 export interface Friendship {
@@ -1938,6 +1943,58 @@ export const db = {
             .eq('ticket_id', ticketRow.ticket_id);
         if (updErr) throw updErr;
         return { ok: true, message: 'Check-in successful' };
+    },
+
+    /**
+     * Process a mock payment for the current user for a given event.
+     * Calls the `mock_process_payment` RPC (created in Supabase by the SQL below).
+     * Returns the RPC result with payment_id, status and message.
+     */
+    async processMockPayment(eventId: string, amount?: number): Promise<{ paymentId?: string; status: string; message?: string }> {
+        if (!isSupabaseEnabled || !supabase) {
+            // Local fallback: simulate success 80% of the time
+            const ok = Math.random() < 0.8;
+            return {
+                paymentId: cryptoRandomId(),
+                status: ok ? 'success' : 'failure',
+                message: ok ? 'Mock payment succeeded (local)' : 'Mock payment failed (local)'.toString(),
+            };
+        }
+        try {
+            const { data, error } = await supabase.rpc('mock_process_payment', { p_event_id: eventId, p_amount: amount ?? 0 });
+            if (error) throw error;
+            // RPC may return a row or an array
+            const row = Array.isArray(data) ? data[0] : data;
+            return {
+                paymentId: row?.payment_id ?? undefined,
+                status: row?.status ?? String(row?.result ?? 'unknown'),
+                message: row?.message ?? row?.msg ?? null,
+            };
+        } catch (e) {
+            throw e;
+        }
+    },
+
+    /**
+     * Check whether the current user has a successful payment for the event.
+     */
+    async hasUserPaid(eventId: string): Promise<boolean> {
+        if (!isSupabaseEnabled || !supabase) return false;
+        const uid = await requireAuth();
+        try {
+            // Prefer ticket-level paid flag
+            const { data: t } = await supabase.from('tickets').select('is_paid').eq('event_id', eventId).eq('user_id', uid).maybeSingle();
+            if (t && typeof (t as any).is_paid !== 'undefined') return !!(t as any).is_paid;
+
+            const { data: r } = await supabase.from('registrations').select('is_paid').eq('event_id', eventId).eq('user_id', uid).maybeSingle();
+            if (r && typeof (r as any).is_paid !== 'undefined') return !!(r as any).is_paid;
+
+            const { data: p } = await supabase.from('payments').select('status').eq('event_id', eventId).eq('user_id', uid).order('created_at', { ascending: false }).limit(1).maybeSingle();
+            if (p && (p as any).status) return String((p as any).status).toLowerCase() === 'success';
+        } catch {
+            // ignore and return false
+        }
+        return false;
     },
 };
 

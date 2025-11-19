@@ -211,6 +211,17 @@ Ensure your Python environment has `requests` installed if any script imports it
 7. **organizations** – Approved organizations
 
 ---
+
+
+## 📄 Documentation Index
+
+- [Student User Guide](Sprint4/docs/student_user_guide.md)
+- [Organizer User Guide](Sprint4/docs/organizer_user_guide.md)
+- [Admin User Guide](Sprint4/docs/admin_user_guide.md)
+- [Deployment Guide](Sprint4/docs/deployment_guide.md)
+
+
+---
 ![Logo](https://upload.wikimedia.org/wikipedia/fr/9/97/Universit%C3%A9_Concordia_%28logo%29.svg)
 
 

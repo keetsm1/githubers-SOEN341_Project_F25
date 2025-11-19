@@ -1,4 +1,4 @@
-name: E2E - Python Selenium Tests
+name: Python Tests
 
 on:
   push:
@@ -66,10 +66,10 @@ jobs:
           pip install selenium webdriver-manager pytest
 
       # --- Run Python tests ---
-      - name: Run Python E2E tests
+      - name: Run Python  tests
         run: |
           mkdir -p test-reports
-          pytest test-cases/ --maxfail=1 --disable-warnings --junitxml=test-reports/results.xml
+          pytest sprint4/ --maxfail=1 --disable-warnings --junitxml=test-reports/results.xml
         continue-on-error: true
 
       # --- Upload test logs and artifacts ---

@@ -108,6 +108,17 @@ jobs:
         working-directory: Sprint4/squad-events-pro
         run: npm ci
 
+      # IMPORTANT: overwrite .env (don’t append) to avoid the stray "E" in repo .env
+      - name: Write Vite .env from GitHub Secrets (overwrite)
+        working-directory: Sprint4/squad-events-pro
+        run: |
+          rm -f .env
+          cat > .env <<'ENV'
+          VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+          VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+          ENV
+          echo "Wrote .env (lengths): URL=$(printf %s "$VITE_SUPABASE_URL" | wc -c), KEY=$(printf %s "$VITE_SUPABASE_ANON_KEY" | wc -c)"
+
       - name: Start Vite dev server
         working-directory: Sprint4/squad-events-pro
         run: |

@@ -212,20 +212,6 @@ Ensure your Python environment has `requests` installed if any script imports it
 
 ---
 
-
-## 📄 Documentation Index
-
-- [Student User Guide](Sprint4/docs/student_user_guide.md)
-- [Organizer User Guide](Sprint4/docs/organizer_user_guide.md)
-- [Admin User Guide](Sprint4/docs/admin_user_guide.md)
-- [Deployment Guide](Sprint4/docs/deployment_guide.md)
-- [User Manual (All Roles)](Sprint4/docs/user_manual.md)
-- [Ticket Lifecycle](Sprint4/docs/ticket_lifecycle.md)
-- [Wiki Home Draft](Sprint4/docs/wiki_home.md)
-- [Coding Style & Naming Conventions](styANDCONV.md)
-
-
----
 ![Logo](https://upload.wikimedia.org/wikipedia/fr/9/97/Universit%C3%A9_Concordia_%28logo%29.svg)
 
 

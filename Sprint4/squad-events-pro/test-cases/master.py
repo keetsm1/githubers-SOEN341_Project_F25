@@ -15,6 +15,24 @@ for script in scripts:
     proc = subprocess.run([sys.executable, script], cwd=os.path.dirname(__file__))
     results.append((script, proc.returncode))
 
+print("[RUN] locust-load")
+locust_cmd = [
+    "locust",
+    "-f",
+    "locustfile.py",
+    "--headless",
+    "-u",
+    "20",
+    "-r",
+    "5",
+    "-t",
+    "1m",
+    "--host",
+    os.getenv("APP_BASE_URL", "http://localhost:5173"),
+]
+proc = subprocess.run(locust_cmd, cwd=os.path.dirname(__file__))
+results.append(("locust-load", proc.returncode))
+
 print("\n[SUMMARY]")
 for script, code in results:
     status = "PASS" if code == 0 else f"FAIL (exit {code})"

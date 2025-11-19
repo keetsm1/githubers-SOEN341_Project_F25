@@ -24,6 +24,144 @@ A collaborative campus events and ticketing web application built by our team fo
 This project is a Campus Events & Ticketing Web Application designed to help students discover, organize, and attend events on campus. The system streamlines event management by allowing students to browse events, claim tickets, and check in with QR codes. Organizers can create and manage events while tracking attendance through dashboards, and administrators oversee organizations, moderate event listings, and access global analytics.
 
 
+This document is the single source of truth for cloning, configuring, testing, and running the Sprint 4 deliverable of `squad-events-pro`. Follow the steps in order; no additional tribal knowledge is required.
+
+---
+
+## 1. Prerequisites
+
+- **OS:** macOS, Linux, or WSL2
+- **Node.js:** 20.x (ships with npm 10) – use `nvm use 20` if available
+- **Python:** 3.11+ (for scripted test cases)
+- **Supabase account:** project owner or developer-level access
+- **Git:** 2.40+
+
+Optional but recommended:
+
+- **Supabase CLI** (`brew install supabase/tap/supabase`) for seeding and running SQL locally.
+
+---
+
+## 2. Clone & Repo Layout
+
+```bash
+git clone https://github.com/<org>/githubers-SOEN341_Project_F25.git
+cd githubers-SOEN341_Project_F25
+```
+
+Relevant directories:
+
+- `Sprint4/squad-events-pro/` – React + Vite frontend (uses Supabase).
+- `Sprint4/squad-events-pro/db/` – SQL scripts for database schema & RPCs.
+- `Sprint4/squad-events-pro/test-cases/` – Python-based high-level regression scripts.
+
+---
+
+## 3. Environment Variables
+
+Create `Sprint4/squad-events-pro/.env.local` (Vite auto-loads `.env.local`, `.env`) with:
+
+```
+VITE_SUPABASE_URL=<https://YOUR_PROJECT.supabase.co>
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+```
+
+| Variable | Description | Source |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | REST URL for your Supabase project | Supabase Dashboard → Project Settings → API |
+| `VITE_SUPABASE_ANON_KEY` | Public anon key with Row Level Security rules applied | Same as above |
+
+> Keep secrets out of commits. Copy `.env.local` from the provided template and never push it.
+
+Sample file:
+
+```
+VITE_SUPABASE_URL=https://abc123.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+---
+
+## 4. Backend (Supabase) Setup
+
+1. **Create/Select Project:** In Supabase, create a new project or reuse an existing dev project.
+2. **Run Schema SQL:** From the dashboard SQL editor (or Supabase CLI), run the script `Sprint4/squad-events-pro/db/create_payments_and_rpc.sql`.
+   ```bash
+   supabase db execute --file Sprint4/squad-events-pro/db/create_payments_and_rpc.sql
+   ```
+3. **Auth & RLS:** Ensure the default policies allow authenticated requests for `profiles`, `events`, `companies`, etc. The app expects RLS enabled with Supabase-authenticated users.
+4. **Storage (Optional):** If event images are required, create a bucket named `event-images` and allow public read + authenticated write.
+5. **Copy API Keys:** Grab the anon key & URL from Project Settings → API and paste into `.env.local`.
+
+---
+
+## 5. Frontend Setup
+
+```bash
+cd Sprint4/squad-events-pro
+npm install
+npm run dev
+```
+
+The Vite dev server defaults to `http://localhost:5173`. The app will automatically connect to the Supabase instance referenced in `.env.local`.
+
+Key dependencies (managed via `package.json`):
+
+- React 18 + TypeScript 5, Vite 5, Tailwind CSS 3
+- shadcn/ui + Radix UI primitives
+- TanStack Query, React Router DOM, Supabase JS SDK, Recharts
+
+---
+
+## 6. Running Tests & Quality Checks
+
+| Layer | Command | Notes |
+| --- | --- | --- |
+| Frontend lint | `npm run lint` | ESLint rules for React/TypeScript |
+| Scenario scripts | `cd test-cases && python3 master.py` | Executes student/company flows end-to-end via mocked APIs |
+
+The `master.py` harness will run:
+
+```bash
+python3 Sprint4/squad-events-pro/test-cases/master.py
+```
+
+Ensure your Python environment has `requests` installed if any script imports it (`pip install -r requirements.txt` if present or `pip install requests`).
+
+---
+
+## 7. Local Deployment (Prod-like)
+
+1. Build static assets:
+   ```bash
+   cd Sprint4/squad-events-pro
+   npm run build
+   ```
+2. Preview the production build (uses the same `.env.local` values):
+   ```bash
+   npm run preview -- --host
+   ```
+3. For containerized deploys, serve the `dist/` folder via any static host (Netlify, Vercel, Nginx) and expose the same Supabase env vars.
+
+---
+
+## 8. Troubleshooting Tips
+
+- **Blank screen / 401 errors:** Verify the Supabase URL & anon key match the project you seeded.
+- **Migrations fail:** Confirm you’re targeting the correct Supabase project; rerun the SQL script.
+- **Python tests cannot find modules:** Run them from the `test-cases` folder or pass `PYTHONPATH` accordingly.
+- **Port conflicts:** Override the Vite dev port with `npm run dev -- --port 5174`.
+
+---
+
+## 9. Next Steps
+
+- Keep `.env.local` updated per environment (dev, staging, prod).
+- Commit documentation updates alongside code changes each sprint.
+- Share this README with new collaborators to ensure consistent onboarding.
+
+
+
 :pushpin:**Core Features**
 ---
 1. Student Event Experience

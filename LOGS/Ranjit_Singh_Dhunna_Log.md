@@ -25,3 +25,11 @@
 | 2025-10-23 | Task.20.2                | 3 pts        | Medium   | Built admin dashboard and system-wide metrics |
 | 2025-10-23 | Task.12.1                | 3 pts        | Medium   | Created wiki structure for onboarding and documentation |
 | 2025-10-23 | Task.12.2                | 3 pts        | Medium   | Developed developer setup guide |
+| 2025-11-05 | Task.23.1                | 2 pts        | Medium   | Documented full system architecture, data flow, and module relationships for all roles. |
+| 2025-11-05 | Task.23.2                | 2 pts        | Medium   | Completed API and endpoint documentation with request/response formats and consistency review. |
+| 2025-11-06 | Task.23.3                | 2 pts        | Medium   | Updated README and setup guide including environment configuration and installation steps. |
+| 2025-11-06 | Task.23.4                | 2 pts        | Medium   | Wrote detailed user guides for Student, Organizer, and Admin workflows with screenshots. |
+| 2025-11-07 | Task.23.5                | 2 pts        | Medium   | Created deployment documentation covering environment variables, pipeline steps, and production checklist. |
+| 2025-11-07 | Task.23.6                | 2 pts        | Medium   | Coordinated Sprint 4 progress, validated deliverables, and prepared for final demo rehearsal. |
+| 2025-11-08 | Task.29.1                | 3 pts        | High     | Developed final demo script, user flow, and coordinated speaker roles for presentation. |
+| 2025-11-08 | Task.29.2                | 3 pts        | High     | Designed final presentation slides covering features, architecture, challenges, and outcomes. |

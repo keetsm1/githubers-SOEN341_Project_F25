@@ -32,11 +32,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: Sprint4/squad-events-pro/package-lock.json
 
       - name: Install Node dependencies
+        working-directory: Sprint4/squad-events-pro
         run: npm ci
 
       - name: Start Vite dev server
+        working-directory: Sprint4/squad-events-pro
         run: |
           npm run dev -- --host 0.0.0.0 --port 5173 &
           for i in {1..40}; do
@@ -69,7 +72,7 @@ jobs:
       - name: Run Python  tests
         run: |
           mkdir -p test-reports
-          pytest sprint4/ --maxfail=1 --disable-warnings --junitxml=test-reports/results.xml
+          pytest Sprint4/ --maxfail=1 --disable-warnings --junitxml=test-reports/results.xml
         continue-on-error: true
 
       # --- Upload test logs and artifacts ---

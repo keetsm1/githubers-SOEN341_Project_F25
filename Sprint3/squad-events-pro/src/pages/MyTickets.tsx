@@ -72,7 +72,9 @@ const MyTickets: React.FC = () => {
               currentAttendees: 0,
               imageUrl: row.image_url ?? undefined,
               tags: (row as any).tags ?? [],
-              isApproved: (row as any).status === 'published' || (row as any).status === true,
+                      isApproved: (row as any).status === 'published' || (row as any).status === true,
+                      isPaid: !!(row as any).is_paid,
+                      price: row.price ? Number(row.price) : 0,
               createdAt: (row as any).created_at,
             };
             eventMap.set(eid, ev);
@@ -201,6 +203,33 @@ const MyTickets: React.FC = () => {
                     >
                       <Trash2 className="w-4 h-4 mr-2" /> Cancel RSVP
                     </Button>
+                    {event && event.isPaid && !ticket.isPaid && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            // show loader on the button by replacing with temporary state
+                            const idx = items.findIndex(it => it.ticket.id === ticket.id);
+                            // call RPC
+                            const res = await db.processMockPayment(ticket.eventId, event.price ?? 0);
+                            if (res.status && String(res.status).toLowerCase() === 'success') {
+                              // mark locally as paid
+                              const copy = [...items];
+                              copy[idx] = { ...copy[idx], ticket: { ...copy[idx].ticket, isPaid: true } };
+                              setItems(copy);
+                              toast({ title: 'Payment Successful', description: res.message ?? 'Payment processed (mock).' });
+                            } else {
+                              toast({ variant: 'destructive', title: 'Payment Failed', description: res.message ?? 'Mock payment failed. Try again.' });
+                            }
+                          } catch (e: any) {
+                            toast({ variant: 'destructive', title: 'Payment Error', description: e?.message ?? 'Failed to process payment.' });
+                          }
+                        }}
+                      >
+                        Pay Now
+                      </Button>
+                    )}
                     {event ? (
                       <Button variant="outline" asChild>
                         <Link to={`/events/${event.id}`}>

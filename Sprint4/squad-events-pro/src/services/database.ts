@@ -152,6 +152,9 @@ export interface Event {
     imageUrl?: string;
     tags: string[];
     isApproved: boolean;
+    // Payment-related flags for UI
+    isPaid?: boolean;
+    price?: number;
     // Derived UI status for display
     statusText?: 'approved' | 'pending' | 'rejected';
     createdAt: string;
@@ -165,6 +168,8 @@ export interface Ticket {
     isCheckedIn: boolean;  // future use; not persisted yet
     checkedInAt?: string;  // future use; not persisted yet
     createdAt: string;     // created_at
+    // Paid flag (mapped from tickets or registrations)
+    isPaid?: boolean;
 }
 
 export interface Friendship {
@@ -495,6 +500,27 @@ const mockEvents: Event[] = [
         createdAt: '2024-09-15T14:00:00Z',
     },
 ];
+
+// Lightweight in-memory caches to avoid redundant RPC/database calls during rapid UI refreshes
+const STATS_TTL_MS = 5 * 1000; // 5 seconds
+let _globalStatsCache: { ts: number; value: Analytics } | null = null;
+const _organizerStatsCache: Map<string, { ts: number; value: Analytics }> = new Map();
+
+function validateAnalytics(raw: any): Analytics {
+    const totalRegistrations = Number(raw?.totalRegistrations ?? raw?.total_registrations ?? 0) || 0;
+    const ticketsSold = Number(raw?.ticketsSold ?? raw?.tickets_sold ?? totalRegistrations) || totalRegistrations;
+    const checkedIn = Number(raw?.checkedIn ?? raw?.checked_in ?? 0) || 0;
+    const attendanceRate = Number(raw?.attendanceRate ?? raw?.attendance_rate ?? 0) || 0;
+    const eventsByCategory = (raw?.eventsByCategory && typeof raw.eventsByCategory === 'object') ? raw.eventsByCategory : {};
+    const registrationTrend = Array.isArray(raw?.registrationTrend) ? raw.registrationTrend : [];
+    return { totalRegistrations, ticketsSold, checkedIn, attendanceRate, eventsByCategory, registrationTrend };
+}
+
+function invalidateStatsCache(organizerId?: string) {
+    _globalStatsCache = null;
+    if (organizerId) _organizerStatsCache.delete(organizerId);
+    else _organizerStatsCache.clear();
+}
 
 /** ──────────────────────────────────────────────────────────────────────────
  *  Friend Requests (Supabase)
@@ -983,6 +1009,9 @@ export const db = {
 
                 const t = rpcData as any;
                 setRecentlyJoined(uid, eventId);
+                // Invalidate cached aggregates since registrations changed
+                try { invalidateStatsCache(); } catch {}
+
                 return {
                     id: t.ticket_id ?? t.id ?? cryptoRandomId(),
                     eventId: t.event_id ?? eventId,
@@ -1045,6 +1074,9 @@ export const db = {
             } catch { /* ignore mirror errors */ }
 
             setRecentlyJoined(uid, eventId);
+            // Invalidate cached aggregates since registrations changed
+            try { invalidateStatsCache(); } catch {}
+
             if (ticketRow) {
                 return {
                     id: ticketRow.ticket_id,
@@ -1092,6 +1124,7 @@ export const db = {
         };
         writeJSON<Ticket[]>('tickets', [ticket, ...all]);
         setRecentlyJoined(uidLS, eventId);
+        try { invalidateStatsCache(); } catch {}
         return ticket;
     },
 
@@ -1681,12 +1714,36 @@ export const db = {
             };
         }
 
-        // Count all tickets
+        // Return cached value when fresh
+        try {
+            if (_globalStatsCache && (Date.now() - _globalStatsCache.ts) < STATS_TTL_MS) {
+                return _globalStatsCache.value;
+            }
+        } catch {}
+
+        // Prefer the database RPC if available (faster, server-side aggregation)
+        try {
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('get_global_stats');
+            if (!rpcErr && rpcData) {
+                const row = Array.isArray(rpcData) ? rpcData[0] : (rpcData as any);
+                const candidate = validateAnalytics({
+                    totalRegistrations: Number(row?.total_registrations ?? 0),
+                    checkedIn: Number(row?.checked_in ?? 0),
+                    attendanceRate: Number(row?.attendance_rate ?? 0),
+                });
+                _globalStatsCache = { ts: Date.now(), value: candidate };
+                return candidate;
+            }
+        } catch {
+            // ignore and fall back to client-side aggregation
+        }
+
+        // Count all tickets (fallback)
         const { count: ticketsCount } = await supabase
             .from('tickets')
             .select('*', { count: 'exact', head: true });
 
-        // Count checked-in tickets
+        // Count checked-in tickets (fallback)
         const { count: checkedCount } = await supabase
             .from('tickets')
             .select('*', { count: 'exact', head: true })
@@ -1730,7 +1787,7 @@ export const db = {
         const checked = checkedCount || 0;
         const attendanceRate = total > 0 ? Math.round((checked / total) * 100) : 0;
 
-        return {
+        const result = {
             totalRegistrations: total,
             ticketsSold: total,
             checkedIn: checked,
@@ -1740,6 +1797,9 @@ export const db = {
                 .sort()
                 .map((date) => ({ date, count: trendMap[date] })),
         };
+        const validated = validateAnalytics(result);
+        _globalStatsCache = { ts: Date.now(), value: validated };
+        return validated;
     },
 
     async getEventStats(eventId: string): Promise<Analytics> {
@@ -1824,6 +1884,30 @@ export const db = {
             };
         }
 
+
+        // Return cached value when fresh
+        try {
+            const cached = _organizerStatsCache.get(organizerUserId);
+            if (cached && (Date.now() - cached.ts) < STATS_TTL_MS) return cached.value;
+        } catch {}
+
+        // Prefer server-side RPC aggregation when available
+        try {
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('get_organizer_stats', { p_organizer: organizerUserId });
+            if (!rpcErr && rpcData) {
+                const row = Array.isArray(rpcData) ? rpcData[0] : (rpcData as any);
+                const candidate = validateAnalytics({
+                    totalRegistrations: Number(row?.total_registrations ?? 0),
+                    checkedIn: Number(row?.checked_in ?? 0),
+                    attendanceRate: Number(row?.attendance_rate ?? 0),
+                });
+                _organizerStatsCache.set(organizerUserId, { ts: Date.now(), value: candidate });
+                return candidate;
+            }
+        } catch {
+            // ignore and fall back to prior method
+        }
+
         // First get all event ids created by this user
         const { data: eventsRows, error: evErr } = await supabase
             .from('events')
@@ -1842,7 +1926,7 @@ export const db = {
             };
         }
 
-        // Tickets for these events
+        // Tickets for these events (fallback)
         const { count: total } = await supabase
             .from('tickets')
             .select('*', { count: 'exact', head: true })
@@ -2048,6 +2132,62 @@ export const db = {
             .eq('ticket_id', ticketRow.ticket_id);
         if (updErr) throw updErr;
         return { ok: true, message: 'Check-in successful' };
+    },
+
+    /**
+     * Process a mock payment for the current user for a given event.
+     * Calls the `mock_process_payment` RPC (created in Supabase by the SQL below).
+     * Returns the RPC result with payment_id, status and message.
+     */
+    async processMockPayment(eventId: string, amount?: number): Promise<{ paymentId?: string; status: string; message?: string }> {
+        if (!isSupabaseEnabled || !supabase) {
+            // Local fallback: simulate success 80% of the time
+            const ok = Math.random() < 0.8;
+            return {
+                paymentId: cryptoRandomId(),
+                status: ok ? 'success' : 'failure',
+                message: ok ? 'Mock payment succeeded (local)' : 'Mock payment failed (local)'.toString(),
+            };
+        }
+        try {
+            const { data, error } = await supabase.rpc('mock_process_payment', { p_event_id: eventId, p_amount: amount ?? 0 });
+            if (error) throw error;
+            // RPC may return a row or an array
+            const row = Array.isArray(data) ? data[0] : data;
+            // Invalidate stats cache when payment status is success so dashboard updates quickly
+            try {
+                if ((row?.status ?? '').toString().toLowerCase() === 'success') invalidateStatsCache();
+            } catch {}
+            return {
+                paymentId: row?.payment_id ?? undefined,
+                status: row?.status ?? String(row?.result ?? 'unknown'),
+                message: row?.message ?? row?.msg ?? null,
+            };
+        } catch (e) {
+            throw e;
+        }
+    },
+
+    /**
+     * Check whether the current user has a successful payment for the event.
+     */
+    async hasUserPaid(eventId: string): Promise<boolean> {
+        if (!isSupabaseEnabled || !supabase) return false;
+        const uid = await requireAuth();
+        try {
+            // Prefer ticket-level paid flag
+            const { data: t } = await supabase.from('tickets').select('is_paid').eq('event_id', eventId).eq('user_id', uid).maybeSingle();
+            if (t && typeof (t as any).is_paid !== 'undefined') return !!(t as any).is_paid;
+
+            const { data: r } = await supabase.from('registrations').select('is_paid').eq('event_id', eventId).eq('user_id', uid).maybeSingle();
+            if (r && typeof (r as any).is_paid !== 'undefined') return !!(r as any).is_paid;
+
+            const { data: p } = await supabase.from('payments').select('status').eq('event_id', eventId).eq('user_id', uid).order('created_at', { ascending: false }).limit(1).maybeSingle();
+            if (p && (p as any).status) return String((p as any).status).toLowerCase() === 'success';
+        } catch {
+            // ignore and return false
+        }
+        return false;
     },
 };
 

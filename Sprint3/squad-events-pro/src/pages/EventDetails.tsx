@@ -35,6 +35,7 @@ const EventDetails: React.FC = () => {
   const [showRSVPDialog, setShowRSVPDialog] = useState(false);
   const { toast } = useToast();
   const [hasTicket, setHasTicket] = useState(false);
+  const [hasPaid, setHasPaid] = useState(false);
   const [attendeeCount, setAttendeeCount] = useState<number>(0);
   const [eventAnalytics, setEventAnalytics] = useState<import('@/services/database').Analytics | null>(null);
   const [trend, setTrend] = useState<{ date: string; rsvps: number; checkins: number }[]>([]);
@@ -69,6 +70,8 @@ const EventDetails: React.FC = () => {
             (typeof (row as any).status === 'string' && ['published','approved'].includes(String((row as any).status).toLowerCase())),
           createdAt: (row as any).created_at,
           status: (row as any).status,
+          isPaid: !!(row as any).is_paid,
+          price: (row as any).price ? Number(row.price) : 0,
         };
         setEvent(mapped);
         // Load per-event analytics and trends for organizers
@@ -189,6 +192,10 @@ const EventDetails: React.FC = () => {
         // Use session-bound lookup to avoid id mismatches
         const already = await db.hasUserTicket(eventId);
         if (mounted) setHasTicket(prev => prev || already);
+        try {
+          const paid = await db.hasUserPaid(eventId);
+          if (mounted) setHasPaid(paid);
+        } catch {}
       } catch {}
     };
     run();
@@ -340,6 +347,17 @@ const EventDetails: React.FC = () => {
                     </AlertDialog>
                   ) : null
                 )}
+                {/* Paid event: show Pay Now if user hasn't paid yet but has RSVP (or hasTicket is true) */}
+                {user?.role === 'student' && event.isPaid && (
+                  <div className="ml-4">
+                    <PayNowButton
+                      eventId={event.id}
+                      amount={event.price ?? 0}
+                      initialPaid={hasPaid}
+                      onPaid={() => setHasPaid(true)}
+                    />
+                  </div>
+                )}
                 {user && (user.role === 'company' || user.role === 'admin') && event.organizerId === user.id && (
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => navigate(`/scan/${event.id}`)}>
@@ -478,6 +496,39 @@ const EventDetails: React.FC = () => {
         )}
       </div>
     </div>
+  );
+};
+
+// Small Pay Now button component (local to this file)
+const PayNowButton: React.FC<{ eventId: string; amount: number; initialPaid?: boolean; onPaid?: () => void }> = ({ eventId, amount, initialPaid = false, onPaid }) => {
+  const { toast } = useToast();
+  const [loading, setLoading] = React.useState(false);
+  const [paid, setPaid] = React.useState(initialPaid);
+
+  const handlePay = async () => {
+    setLoading(true);
+    try {
+      // call db helper which invokes the RPC
+      const res = await (await import('@/services/database')).db.processMockPayment(eventId, amount);
+      if (res.status && String(res.status).toLowerCase() === 'success') {
+        setPaid(true);
+        toast({ title: 'Payment Successful', description: res.message ?? 'Your payment was processed (mock).' });
+        try { if (onPaid) onPaid(); } catch {}
+      } else {
+        toast({ variant: 'destructive', title: 'Payment Failed', description: res.message ?? 'Mock payment failed. Please try again.' });
+      }
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Payment Error', description: (e?.message) || 'Failed to process payment.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (paid) return <Button variant="primary" disabled>Paid</Button>;
+  return (
+    <Button onClick={handlePay} disabled={loading} className="bg-gradient-to-r from-emerald-500 to-emerald-400">
+      {loading ? 'Processing…' : `Pay Now ${amount ? `- $${amount.toFixed(2)}` : ''}`}
+    </Button>
   );
 };
 

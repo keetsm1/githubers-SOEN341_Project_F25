@@ -13,12 +13,14 @@ import {
   MapPin
 } from 'lucide-react';
 import Navigation from '@/components/layout/Navigation';
+import { usePayment } from '@/contexts/PaymentContext';
 import EventCard from '@/components/events/EventCard';
 import LoginForm from '@/components/auth/LoginForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { db, Event, listEvents } from '@/services/database';
 
 const Index = () => {
+  const paymentCtx = usePayment();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
@@ -27,13 +29,15 @@ const Index = () => {
   const [myRsvps, setMyRsvps] = useState<number>(0);
   const [friendsCount, setFriendsCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [stats, setStats] = useState<{ totalRegistrations: number; checkedIn: number; totalEvents: number; attendanceRate: number } | null>(null);
 
   useEffect(() => {
     if (user) {
       loadDashboardData();
     }
   }, [user]);
-
   const loadDashboardData = async () => {
     try {
       // Latest published events for the Trending section
@@ -63,10 +67,47 @@ const Index = () => {
       // Get user's friends count
       const friendCount = await db.getUserFriendsCount();
       setFriendsCount(friendCount);
+      // Refresh aggregated stats as well
+      try { await loadStats(); } catch {}
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Auto-refresh stats when payments are processed locally (mock) or when user changes
+  useEffect(() => {
+    if (!user) return;
+    loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, paymentCtx.payments]);
+
+  // Fetch the top-level stats (global for students, organizer-specific for companies)
+  const loadStats = async () => {
+    if (!user) return;
+    setStatsError(null);
+    setStatsLoading(true);
+    try {
+      if (user.role === 'company' || user.role === 'admin') {
+        // Organizer-level stats
+        const orgStats = await db.getOrganizerStats(user.id);
+        // Count events created by this organizer
+        const eventsResp = await db.getEvents({ organizerId: user.id, limit: 1 });
+        const totalEvents = eventsResp.meta?.total ?? 0;
+        setStats({ totalRegistrations: orgStats.totalRegistrations, checkedIn: orgStats.checkedIn, totalEvents, attendanceRate: orgStats.attendanceRate });
+      } else {
+        // Global stats for students
+        const global = await db.getGlobalStats();
+        const eventsResp = await db.getEvents({ approved: true, limit: 1 });
+        const totalEvents = eventsResp.meta?.total ?? 0;
+        setStats({ totalRegistrations: global.totalRegistrations, checkedIn: global.checkedIn, totalEvents, attendanceRate: global.attendanceRate });
+      }
+    } catch (e: any) {
+      console.error('Failed to load stats', e);
+      setStatsError((e && e.message) || 'Failed to load statistics');
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -102,14 +143,39 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid md:grid-cols-3 gap-4 mb-8">
+        {/* Quick Stats (Dynamic) */}
+        <div className="grid md:grid-cols-4 gap-4 mb-8">
           <Card className="shadow-card hover:shadow-elevated transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Events This Week</p>
-                  <p className="text-2xl font-bold text-primary">{loading ? '-' : eventsThisWeek}</p>
+                  <p className="text-sm text-muted-foreground">Total Registrations</p>
+                  <p className="text-2xl font-bold text-primary">{statsLoading ? '…' : (stats ? stats.totalRegistrations : '-')}</p>
+                  {statsError && <p className="text-xs text-destructive mt-1">{statsError}</p>}
+                </div>
+                <TrendingUp className="w-8 h-8 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card hover:shadow-elevated transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Checked In</p>
+                  <p className="text-2xl font-bold text-accent">{statsLoading ? '…' : (stats ? stats.checkedIn : '-')}</p>
+                </div>
+                <Users className="w-8 h-8 text-accent" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card hover:shadow-elevated transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Events</p>
+                  <p className="text-2xl font-bold text-primary">{statsLoading ? '…' : (stats ? stats.totalEvents : '-')}</p>
                 </div>
                 <Calendar className="w-8 h-8 text-primary" />
               </div>
@@ -120,22 +186,10 @@ const Index = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">My RSVPs</p>
-                  <p className="text-2xl font-bold text-accent">{loading ? '-' : myRsvps}</p>
+                  <p className="text-sm text-muted-foreground">Attendance Rate</p>
+                  <p className="text-2xl font-bold text-accent">{statsLoading ? '…' : (stats ? `${stats.attendanceRate}%` : '-')}</p>
                 </div>
                 <Star className="w-8 h-8 text-accent" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card hover:shadow-elevated transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Friends Online</p>
-                  <p className="text-2xl font-bold text-primary">{loading ? '-' : friendsCount}</p>
-                </div>
-                <Users className="w-8 h-8 text-primary" />
               </div>
             </CardContent>
           </Card>

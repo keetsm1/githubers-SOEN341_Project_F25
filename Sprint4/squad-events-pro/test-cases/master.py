@@ -6,6 +6,8 @@ scripts = [
     "student-sign-up.py",
     "company-sign-up.py",
     "company-make-events.py",
+    "admin-approve-events.py",
+    "database-operations.py",
 ]
 
 results = []

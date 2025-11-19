@@ -11,6 +11,8 @@
 | 2025-11-18 | Task.24.1   | 3 pts     | High  | System Testing for ALL User Roles |
 | 2025-11-18 | Task.24.2   | 2 pts     | Medium| Cross-Browser Testing (Functional Verification) |
 | 2025-11-18 | Task.24.3   | 3 pts     | High  | Mobile Responsiveness Testing|
+| 2025-11-18 | Task.24.4   | 2 pts     | Medium  | Create Manual Testing Report for the Application|
+
 
 
 

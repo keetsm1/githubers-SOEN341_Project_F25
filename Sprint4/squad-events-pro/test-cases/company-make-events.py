@@ -54,6 +54,9 @@ QUIET = os.getenv("QUIET", "1") == "1"
 COMPANY_EMAIL = os.getenv("COMPANY_EMAIL")
 COMPANY_PASSWORD = os.getenv("COMPANY_PASSWORD")
 
+print("CI DEBUG: COMPANY_EMAIL set:", os.getenv("COMPANY_EMAIL") is not None)
+print("CI DEBUG: COMPANY_PASSWORD set:", os.getenv("COMPANY_PASSWORD") is not None)
+
 PAGE_WAIT_SEC = 15
 TOAST_WAIT_SEC = 6
 EVENT_MINUTES_AHEAD = int(os.getenv("EVENT_MINUTES_AHEAD", "180") or 180)

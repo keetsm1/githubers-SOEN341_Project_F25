@@ -72,7 +72,7 @@ jobs:
       - name: Run Python  tests
         run: |
           mkdir -p test-reports
-          pytest Sprint4/squad-events-pro/test-cases --maxfail=1 --disable-warnings --junitxml=test-reports/results.xml
+          python Sprint4/squad-events-pro/test-cases/master.py
         continue-on-error: true
 
       # --- Upload test logs and artifacts ---

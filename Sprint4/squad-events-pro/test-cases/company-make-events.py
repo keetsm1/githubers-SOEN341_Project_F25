@@ -51,8 +51,8 @@ LOGIN_URL = BASE_URL
 CREATE_EVENT_URL = f"{BASE_URL}/create-event"
 QUIET = os.getenv("QUIET", "1") == "1"
 
-COMPANY_EMAIL = os.getenv("COMPANY_EMAIL", "testingsprint3@gmail.com")
-COMPANY_PASSWORD = os.getenv("COMPANY_PASSWORD", "testingsprint3")
+COMPANY_EMAIL = os.getenv("COMPANY_EMAIL")
+COMPANY_PASSWORD = os.getenv("COMPANY_PASSWORD")
 
 PAGE_WAIT_SEC = 15
 TOAST_WAIT_SEC = 6

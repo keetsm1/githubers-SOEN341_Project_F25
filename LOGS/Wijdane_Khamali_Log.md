@@ -18,3 +18,9 @@
 | 2025-10-30 | Task 10.5 | 2 pts | Medium | Validated client-side ticket data for accuracy and uniqueness. Handled duplicate prevention and empty-state UI with clear feedback messages. |
 | 2025-10-31 | Task 13.1 | 3 pts | Medium | Added Cancel RSVP feature in MyTickets.tsx. Included confirmation modal, Supabase deletion logic, and real-time UI updates reflecting attendee count. |
 | 2025-10-31 | Task 13.2 | 2 pts | Medium | Ensured synchronization between event and ticket tables after cancellation. Verified cleanup of orphaned data and tested database triggers for consistency. |
+| 2025-11-13 | Task 25.1 | 3 pts | High | Implemented payment system allowing students to pay for events and linked payments to registrations. |
+| 2025-11-13 | Task 25.2 | 2 pts | Medium | Added UI feedback (loading, success, errors) and updated state after payment completion. |
+| 2025-11-18 | Task 25.3 | 2 pts | Medium | Added backend validation to restrict access to event features unless payment is completed. |
+| 2025-11-18 | Task 25.4 | 3 pts | High | Updated student dashboard to show payment status and list of paid events. |
+| 2025-11-18 | Task 25.5 | 2 pts | Medium | Integrated and tested API endpoints for payments and access control with proper error handling. |
+

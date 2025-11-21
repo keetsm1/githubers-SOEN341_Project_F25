@@ -39,14 +39,14 @@ The primary goals for Sprint 4 are to:
 
 | Title | Assignees | Labels | Story Points | Start Date | End Date | Status | Issue Link |
 |-------|------------|--------|-------------|------------|-----------|----------|-------------|
-| **[USER STORY] US.23 – Dashboard Analytics Endpoints** | Keet | Backend, Feature | 8 | Nov 3, 2025 | Nov 24, 2025 | ⏳ In Progress | [#76](https://github.com/) |
-| **[USER STORY] US.25 – Payment System** | Wijidane | Backend, Feature, Payment | 12 | Nov 3, 2025 | Nov 24, 2025 | ⏳ In Progress | [#170](https://github.com/) |
-| **[USER STORY] US.23 – Full Documentation Process** | Ranjit | Documentation, Coordination | 12 | Nov 3, 2025 | Nov 24, 2025 | ⏳ In Progress | [#176](https://github.com/) |
-| **[USER STORY] US.24 – Manual Testing** | Saad | QA, Testing | 10 | Nov 3, 2025 | Nov 24, 2025 | ⏳ In Progress | [#183](https://github.com/) |
-| **[USER STORY] US.26 – CI/CD Pipeline** | Lorne | DevOps, Deployment | 7 | Nov 3, 2025 | Nov 24, 2025 | ⏳ In Progress | [#185](https://github.com/) |
-| **[USER STORY] US.27 – Organizer Bug Fixing (Event Deletion)** | Gunkeet | Bugfix, Backend | 5 | Nov 3, 2025 | Nov 24, 2025 | ⏳ In Progress | [#189](https://github.com/) |
-| **[USER STORY] US.29 – Final Presentation & Demo** | Ranjit | Presentation, Delivery | 6 | Nov 3, 2025 | Nov 24, 2025 | ⏳ In Progress | [#200](https://github.com/) |
-| **[USER STORY] US.28 – Automated Testing Suite & Integration Tests** | Arnav, Keet | Testing, QA, Automation | 14 | Nov 3, 2025 | Nov 24, 2025 | ⏳ In Progress | [#195–199](https://github.com/) |
+| **[USER STORY] US.21 – Database Updation** | Arnav | Backend, Feature | 8 | Nov 3, 2025 | Nov 24, 2025 | ✅ Completed | [#155](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/155)  |
+| **[USER STORY] US.25 – Payment System** | Wijidane | Backend, Feature, Payment | 12 | Nov 3, 2025 | Nov 24, 2025 | ✅ Completed | [#170](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/170)  |
+| **[USER STORY] US.23 – Full Documentation Process** | Ranjit | Documentation, Coordination | 12 | Nov 3, 2025 | Nov 24, 2025 | ✅ Completed | [#176](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/176)  |
+| **[USER STORY] US.24 – Manual Testing** | Saad | QA, Testing | 10 | Nov 3, 2025 | Nov 24, 2025 | ✅ Completed | [#183](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/183) |
+| **[USER STORY] US.26 – CI/CD Pipeline** | Lorne | DevOps, Deployment | 7 | Nov 3, 2025 | Nov 24, 2025 | ✅ Completed | [#185](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/185)  |
+| **[USER STORY] US.27 – Organizer Bug Fixing (Event Deletion)** | Gunkeet | Bugfix, Backend | 5 | Nov 3, 2025 | Nov 24, 2025 | ✅ Completed | [#189](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/189)  |
+| **[USER STORY] US.29 – Final Presentation & Demo** | Ranjit | Presentation, Delivery | 6 | Nov 3, 2025 | Nov 24, 2025 | ✅ Completed | [#200](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/200)  |
+| **[USER STORY] US.28 – Automated Testing Suite & Integration Tests** | Arnav, Keet | Testing, QA, Automation | 14 | Nov 3, 2025 | Nov 24, 2025 | ✅ Completed | [#194](https://github.com/keetsm1/githubers-SOEN341_Project_F25/issues/194)  |
 
 > **Status Legend:**  
 > ✅ Completed | ⏳ In Progress | 🔲 Not Started | ⚠ Blocked
@@ -57,10 +57,10 @@ The primary goals for Sprint 4 are to:
 
 | Metric | Target | Delivered | Status |
 |--------|--------|------------|--------|
-| **Total Story Points** | 84 | 0 | ⏳ In Progress |
-| **Completed Story Points** | 84 | 0 | ⏳ In Progress |
-| **Completion Rate** | 100% | 0% | ⏳ In Progress |
-| **Velocity** | 84 | 0 | ⏳ In Progress |
+| **Total Story Points** | 74 | 0 | ✅ On Track |
+| **Completed Story Points** | 74 | 0 | ✅ On Track |
+| **Completion Rate** | 100% | 0% | ✅ On Track |
+| **Velocity** | 74 | 0 | ✅ On Track |
 
 > **Status Legend:**  
 ✅ On Track – Delivery matches or exceeds target.  

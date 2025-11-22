@@ -23,5 +23,8 @@ module.exports = {
         'src/**/*.{ts,tsx}',
         '!src/main.tsx',
         '!src/vite-env.d.ts'
-    ]
+    ],
+
+    coverageDirectory: '<rootDir>/reports/testing',
+    coverageReporters: ['text', 'text-summary', 'lcov', 'json']
 };

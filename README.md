@@ -6,15 +6,17 @@ A collaborative campus events and ticketing web application built by our team fo
 
 ## 👥 Team Information
 
-| **Name**            | **Student ID** | **GitHub Username** |
-|---------------------|----------------|---------------------|
-| Gunkeet Mutiana     | 40226566       | [@keetsm1](https://github.com/keetsm1) |
-| Ranjit Singh Dhunna | 40294791       | [@Ranjit-Singh-Dhunna](https://github.com/Ranjit-Singh-Dhunna) |
-| Arnav Singh         | 40258921       | [@arnav-singh-ahlawat](https://github.com/arnav-singh-ahlawat) |
-| Kevin Tam           | 40317186       | [@kevintam20504](https://github.com/kevintam20504) |
-| Saad Asghar         | 40157825       | [@4kbooka](https://github.com/4kbooka) |
-| Lorne Geniele       | 40111396       | [@hotplate5](https://github.com/hotplate5) |
-| Wijdane Khamali     | 40282056       | [@WiwiKiwi20](https://github.com/WiwiKiwi20) |
+| **Name**            | **Student ID** | **Roles** | **GitHub Username** |
+|---------------------|----------------|---------------------|---------------------|
+| Ranjit Singh Dhunna | 40294791       | Scrum Master, Fullstack Developer, Documentaion|[@Ranjit-Singh-Dhunna](https://github.com/Ranjit-Singh-Dhunna) |
+| Gunkeet Mutiana     | 40226566       | Fullstack Developer, Database manager, Testing  |[@keetsm1](https://github.com/keetsm1) |
+| Arnav Singh         | 40258921       | Fullstack Developer, Database manager, Testing  |[@arnav-singh-ahlawat](https://github.com/arnav-singh-ahlawat) |
+| Wijdane Khamali     | 40282056       | Documentation, Fullstack Developer |[@WiwiKiwi20](https://github.com/WiwiKiwi20) |
+| Lorne Geniele       | 40111396       | Backend Developer, Automation & QA|[@hotplate5](https://github.com/hotplate5) |
+| Kevin Tam           | 40317186       | Fullstack Developer|[@kevintam20504](https://github.com/kevintam20504) |
+| Saad Asghar         | 40157825       | Documentation, Testing|[@4kbooka](https://github.com/4kbooka) |
+
+
 
 
 ---

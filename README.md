@@ -3,6 +3,11 @@
 A collaborative campus events and ticketing web application built by our team for SOEN341.
 </p>
 
+:pushpin:**Description**
+---
+This project is a Campus Events & Ticketing Web Application designed to help students discover, organize, and attend events on campus. The system streamlines event management by allowing students to browse events, claim tickets, and check in with QR codes. Organizers can create and manage events while tracking attendance through dashboards, and administrators oversee organizations, moderate event listings, and access global analytics.
+
+---
 
 ## 👥 Team Information
 
@@ -18,17 +23,11 @@ A collaborative campus events and ticketing web application built by our team fo
 
 
 
-
 ---
 
-:pushpin:**Description**
----
-This project is a Campus Events & Ticketing Web Application designed to help students discover, organize, and attend events on campus. The system streamlines event management by allowing students to browse events, claim tickets, and check in with QR codes. Organizers can create and manage events while tracking attendance through dashboards, and administrators oversee organizations, moderate event listings, and access global analytics.
-
-
+# Application Set-up
 This document is the single source of truth for cloning, configuring, testing, and running the Sprint 4 deliverable of `squad-events-pro`. Follow the steps in order; no additional tribal knowledge is required.
 
----
 
 ## 1. Prerequisites
 

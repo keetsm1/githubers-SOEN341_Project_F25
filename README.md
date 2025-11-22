@@ -5,7 +5,7 @@ A collaborative campus events and ticketing web application built by our team fo
 
 :pushpin:**Description**
 ---
-This project is a Campus Events & Ticketing Web Application designed to help students discover, organize, and attend events on campus. The system streamlines event management by allowing students to browse events, claim tickets, and check in with QR codes. Organizers can create and manage events while tracking attendance through dashboards, and administrators oversee organizations, moderate event listings, and access global analytics.
+This project is a Campus Events & Ticketing Web Application designed to help students discover, organize, and attend events on campus while intracting with friends. The system streamlines event management by allowing students to browse events, claim tickets, and check in with QR codes. Organizers can create and manage events while tracking attendance through dashboards, and administrators oversee organizations, moderate event listings, and access global analytics.
 
 ---
 

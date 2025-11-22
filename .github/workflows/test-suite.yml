@@ -1,0 +1,167 @@
+name: Test Suite
+
+on:
+  push:
+    branches:
+      #- main
+      #- master
+      #- develop
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Sprint4/squad-events-pro/package-lock.json
+
+      - name: Install Node dependencies
+        working-directory: Sprint4/squad-events-pro
+        run: npm ci
+
+      - name: Run Jest tests
+        working-directory: Sprint4/squad-events-pro
+        run: npm test
+
+  e2e-python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: unit-tests
+
+    env:
+      APP_BASE_URL: http://localhost:5173
+      HEADLESS: "1"
+      QUIET: "1"
+      STRICT: "0"
+      COMPANY_EMAIL: ${{ secrets.COMPANY_EMAIL }}
+      COMPANY_PASSWORD: ${{ secrets.COMPANY_PASSWORD }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+    steps:
+      # --- Checkout repo ---
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Node.js / Frontend setup ---
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Sprint4/squad-events-pro/package-lock.json
+
+      - name: Install Node dependencies
+        working-directory: Sprint4/squad-events-pro
+        run: npm ci
+
+      # IMPORTANT: overwrite .env (don’t append) to avoid the stray "E" in repo .env
+      - name: Write Vite .env from GitHub Secrets (overwrite)
+        working-directory: Sprint4/squad-events-pro
+        run: |
+          rm -f .env
+          cat > .env <<'ENV'
+          VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+          VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+          ENV
+          echo "Wrote .env (lengths): URL=$(printf %s "$VITE_SUPABASE_URL" | wc -c), KEY=$(printf %s "$VITE_SUPABASE_ANON_KEY" | wc -c)"
+
+      - name: Start Vite dev server
+        working-directory: Sprint4/squad-events-pro
+        run: |
+          npm run dev -- --host 0.0.0.0 --port 5173 &
+          for i in {1..40}; do
+            if curl -sSf http://localhost:5173 > /dev/null; then
+              echo "Vite dev server is up"
+              break
+            fi
+            echo "Waiting for Vite dev server..."
+            sleep 3
+          done
+
+      # --- Python setup ---
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') || hashFiles('**/pyproject.toml') }}
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium webdriver-manager pytest locust
+
+      # --- Run Python tests ---
+      - name: Run Python  tests
+        run: |
+          python Sprint4/squad-events-pro/test-cases/master.py
+        continue-on-error: true
+
+  locust-load:
+    runs-on: ubuntu-latest
+    needs: e2e-python
+
+    env:
+      APP_BASE_URL: http://localhost:5173
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Sprint4/squad-events-pro/package-lock.json
+
+      - name: Install Node dependencies
+        working-directory: Sprint4/squad-events-pro
+        run: npm ci
+
+      - name: Start Vite dev server
+        working-directory: Sprint4/squad-events-pro
+        run: |
+          npm run dev -- --host 0.0.0.0 --port 5173 &
+          for i in {1..40}; do
+            if curl -sSf http://localhost:5173 > /dev/null; then
+              echo "Vite dev server is up"
+              break
+            fi
+            echo "Waiting for Vite dev server..."
+            sleep 3
+          done
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Locust
+        run: |
+          python -m pip install --upgrade pip
+          pip install locust
+
+      - name: Run Locust load test
+        working-directory: Sprint4/squad-events-pro/test-cases
+        run: |
+          python -m locust -f locustfile.py --headless -u 20 -r 5 -t 1m --host "$APP_BASE_URL"

@@ -1,0 +1,220 @@
+Database Schema Proposal for Squad Events
+
+Overview
+- This schema supports: user profiles and roles, events, RSVPs/tickets with QR codes, friend relationships, company verification/approval, and basic analytics. It is designed for Supabase (Postgres) and integrates with Supabase Auth.
+
+Conventions
+- All tables live in schema: public
+- snake_case column names
+- Timestamps in timestamptz with default now()
+- Use UUID primary keys (gen_random_uuid())
+- RLS (Row Level Security) can be enabled per table later
+
+Tables
+
+1) profiles
+- Purpose: Additional per-user fields not stored in auth.users
+- Relationship: profiles.id references auth.users.id
+- Columns:
+  - id uuid primary key references auth.users(id) on delete cascade
+  - full_name text
+  - role text check (role in ('student','company','admin')) default 'student'
+  - organization text
+  - avatar_url text
+  - is_approved boolean not null default true
+  - created_at timestamptz not null default now()
+
+SQL:
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  role text check (role in ('student','company','admin')) default 'student',
+  organization text,
+  avatar_url text,
+  is_approved boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+2) companies
+- Purpose: Company records for organizers (optional if you store this in profiles)
+- Columns:
+  - id uuid primary key default gen_random_uuid()
+  - user_id uuid not null references public.profiles(id) on delete cascade
+  - name text not null
+  - email text not null
+  - description text
+  - status text check (status in ('pending','approved','rejected')) not null default 'pending'
+  - created_at timestamptz not null default now()
+
+SQL:
+create table if not exists public.companies (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  name text not null,
+  email text not null,
+  description text,
+  status text check (status in ('pending','approved','rejected')) not null default 'pending',
+  created_at timestamptz not null default now()
+);
+create index if not exists companies_user_idx on public.companies(user_id);
+create index if not exists companies_status_idx on public.companies(status);
+
+3) events
+- Purpose: Public event listings
+- Columns:
+  - id uuid primary key default gen_random_uuid()
+  - title text not null
+  - description text not null
+  - date timestamptz not null
+  - location text not null
+  - category text not null
+  - organizer_id uuid not null references public.profiles(id)
+  - organizer_name text not null
+  - max_capacity int not null
+  - current_attendees int not null default 0
+  - image_url text
+  - tags text[] not null default '{}'
+  - is_approved boolean not null default false
+  - created_at timestamptz not null default now()
+
+SQL:
+create table if not exists public.events (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text not null,
+  date timestamptz not null,
+  location text not null,
+  category text not null,
+  organizer_id uuid not null references public.profiles(id),
+  organizer_name text not null,
+  max_capacity int not null,
+  current_attendees int not null default 0,
+  image_url text,
+  tags text[] not null default '{}',
+  is_approved boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists events_date_idx on public.events(date asc);
+create index if not exists events_organizer_idx on public.events(organizer_id);
+create index if not exists events_approved_idx on public.events(is_approved);
+
+4) tickets
+- Purpose: RSVP/ticket representation including check-in
+- Columns:
+  - id uuid primary key default gen_random_uuid()
+  - event_id uuid not null references public.events(id) on delete cascade
+  - user_id uuid not null references public.profiles(id) on delete cascade
+  - qr_code text not null
+  - is_checked_in boolean not null default false
+  - checked_in_at timestamptz
+  - created_at timestamptz not null default now()
+
+SQL:
+create table if not exists public.tickets (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references public.events(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  qr_code text not null,
+  is_checked_in boolean not null default false,
+  checked_in_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists tickets_user_idx on public.tickets(user_id);
+create index if not exists tickets_event_idx on public.tickets(event_id);
+
+5) friendships
+- Purpose: Friend graph between users
+- Columns:
+  - id uuid primary key default gen_random_uuid()
+  - user_id uuid not null references public.profiles(id) on delete cascade
+  - friend_id uuid not null references public.profiles(id) on delete cascade
+  - status text check (status in ('pending','accepted','rejected')) not null default 'pending'
+  - created_at timestamptz not null default now()
+- Unique constraint to avoid duplicate edges in one direction
+
+SQL:
+create table if not exists public.friendships (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  friend_id uuid not null references public.profiles(id) on delete cascade,
+  status text check (status in ('pending','accepted','rejected')) not null default 'pending',
+  created_at timestamptz not null default now(),
+  constraint friendships_unique_pair unique (user_id, friend_id)
+);
+create index if not exists friendships_user_idx on public.friendships(user_id);
+create index if not exists friendships_friend_idx on public.friendships(friend_id);
+
+6) approvals (optional if you prefer a workflow table)
+- Purpose: Track approval actions for events/companies
+- Columns:
+  - id uuid primary key default gen_random_uuid()
+  - subject_type text check (subject_type in ('event','company')) not null
+  - subject_id uuid not null
+  - action text check (action in ('approve','reject')) not null
+  - acted_by uuid references public.profiles(id)
+  - reason text
+  - created_at timestamptz not null default now()
+
+SQL:
+create table if not exists public.approvals (
+  id uuid primary key default gen_random_uuid(),
+  subject_type text check (subject_type in ('event','company')) not null,
+  subject_id uuid not null,
+  action text check (action in ('approve','reject')) not null,
+  acted_by uuid references public.profiles(id),
+  reason text,
+  created_at timestamptz not null default now()
+);
+create index if not exists approvals_subject_idx on public.approvals(subject_type, subject_id);
+
+7) tags (optional normalization)
+- If you want normalized tags instead of text[]
+- Tables: tags(id, name) and event_tags(event_id, tag_id)
+
+SQL:
+create table if not exists public.tags (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null
+);
+create table if not exists public.event_tags (
+  event_id uuid not null references public.events(id) on delete cascade,
+  tag_id uuid not null references public.tags(id) on delete cascade,
+  primary key (event_id, tag_id)
+);
+
+Views (optional)
+- v_event_attendance: join events with ticket counts and attendance rate
+Example:
+create or replace view public.v_event_attendance as
+select
+  e.id,
+  e.title,
+  e.date,
+  e.max_capacity,
+  e.current_attendees,
+  count(t.id) filter (where t.id is not null) as tickets_sold,
+  count(t.id) filter (where t.is_checked_in) as checked_in,
+  case when count(t.id) = 0 then 0 else round(100.0 * (count(t.id) filter (where t.is_checked_in)) / nullif(count(t.id),0), 2) end as attendance_rate
+from public.events e
+left join public.tickets t on t.event_id = e.id
+group by e.id;
+
+RLS suggestions (high-level)
+- profiles: users can select their own row; admins can select all
+- events: organizers can insert/update/delete their own events; public select approved=true
+- tickets: users can select their own tickets; organizers of event can select tickets for their events
+- friendships: users can select their own relationships
+- companies: owners can select/update their own; admins can approve/reject
+
+Notes for the app integration
+- Auth: use Supabase Auth for users; store extra fields in profiles
+- Roles: store in profiles.role or auth user_metadata.role; app currently defaults to 'student'
+- Approvals: events.is_approved and companies.status drive UI visibility; optional approvals log for audit
+- Tags: start with events.tags text[] for simplicity; normalize later if needed
+
+Minimal columns the current UI already expects
+- events: id, title, description, date, location, category, organizer_id, organizer_name, max_capacity, current_attendees, image_url, tags[], is_approved, created_at
+- tickets: id, event_id, user_id, qr_code, is_checked_in, checked_in_at, created_at
+- profiles: id, full_name, role, avatar_url, is_approved, created_at
+
+This proposal keeps your current frontend types intact and makes it easy to switch the mock db to Supabase gradually (start with events and tickets, then expand).

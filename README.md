@@ -179,6 +179,20 @@ Ensure your Python environment has `requests` installed if any script imports it
    - View global stats
    - Manage Organizations
 
+
+---
+
+# Demo video 
+
+<p align="center">
+  <a href="https://youtu.be/3zgd0HV7UfU" target="_blank">
+    <img src="https://img.youtube.com/vi/3zgd0HV7UfU/hqdefault.jpg" alt="Watch Demo" width="700"/>
+  </a>
+</p>
+
+> 🎬 Click the image above to watch the full demo
+___
+
 :pushpin: **Tech Stack**
 ---
 

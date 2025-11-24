@@ -53,10 +53,10 @@ The primary goals for Sprint 2 were to:
 
 | Metric | Target | Delivered | Status |
 |--------|--------|------------|--------|
-| **Total Story Points** | 79 | 79 | ✅ On Track |
-| **Completed Story Points** | 79 | 79 | ✅ On Track |
+| **Total Story Points** | 69 | 69 | ✅ On Track |
+| **Completed Story Points** | 69 | 69 | ✅ On Track |
 | **Completion Rate** | 100% | 100% | ✅ On Track |
-| **Velocity** | 79 | 79 | ✅ On Track |
+| **Velocity** | 69 | 69 | ✅ On Track |
 
 > **Status Legend:**  
 ✅ On Track – Delivery matches or exceeds target.  
@@ -104,3 +104,4 @@ The sprint demonstrated how effective coordination and consistent communication 
 By the end of Sprint 2, the GitHubers team successfully delivered a **functional, stable, and visually refined prototype**, ready for further feature expansion in Sprint 3.
 
 ---
+

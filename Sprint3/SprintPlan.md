@@ -62,10 +62,10 @@ The primary goals for Sprint 3 were to:
 
 | Metric | Target | Delivered | Status |
 |--------|--------|------------|--------|
-| **Total Story Points** | 100 | 100 | ✅ On Track |
-| **Completed Story Points** | 100 | 95 | ⚠️ Behind |
-| **Completion Rate** | 100% | 95% | ⚠️ Behind |
-| **Velocity** | 100 | 95 | ⚠️ Behind |
+| **Total Story Points** | 107 | 107 | ✅ On Track |
+| **Completed Story Points** | 107 | 107 | ✅ On Track |
+| **Completion Rate** | 100% | 100% | ✅ On Track |
+| **Velocity** | 107 | 107 | ✅ On Track |
 
 
 > **Status Legend:**  
@@ -114,4 +114,5 @@ The team delivered student RSVP and ticket systems, organizer analytics dashboar
 Through continued collaboration and well-defined roles, the team sustained momentum and prepared for final integration and user testing in Sprint 4.
 
 ---
+
 
